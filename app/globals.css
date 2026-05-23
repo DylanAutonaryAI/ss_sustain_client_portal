@@ -14,10 +14,10 @@
   --text:        #f4f4f5;
   --text2:       rgba(244,244,245,0.55);
   --text3:       rgba(244,244,245,0.3);
-  --accent:      #16c45a;
-  --accent-dim:  rgba(22,196,90,0.12);
-  --accent-mid:  rgba(22,196,90,0.22);
-  --accent-text: #16c45a;
+  --accent:      #20B623;
+  --accent-dim:  rgba(32,182,35,0.12);
+  --accent-mid:  rgba(32,182,35,0.22);
+  --accent-text: #20B623;
   --red:         #f04f4f;
   --amber:       #f59e0b;
   --blue:        #3b82f6;
@@ -38,10 +38,10 @@
   --text:        #18181b;
   --text2:       rgba(24,24,27,0.55);
   --text3:       rgba(24,24,27,0.3);
-  --accent:      #12a84c;
-  --accent-dim:  rgba(18,168,76,0.09);
-  --accent-mid:  rgba(18,168,76,0.18);
-  --accent-text: #0d8f3e;
+  --accent:      #1aa31e;
+  --accent-dim:  rgba(26,163,30,0.09);
+  --accent-mid:  rgba(26,163,30,0.18);
+  --accent-text: #158018;
   --red:         #dc2626;
   --amber:       #d97706;
   --blue:        #2563eb;
@@ -78,6 +78,9 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up { animation: fadeUp 0.3s ease both; }
+
+/* Headings — bold Host Grotesk wherever font-serif class is used */
+.font-serif { font-weight: 700; letter-spacing: -0.025em; }
 
 /* native form elements */
 input, textarea, select { font-family: inherit; }

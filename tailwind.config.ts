@@ -9,8 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans:  ["var(--font-dm-sans)", "DM Sans", "sans-serif"],
-        serif: ["var(--font-dm-serif)", "DM Serif Display", "serif"],
+        sans:  ["'Host Grotesk'", "sans-serif"],
+        serif: ["'Host Grotesk'", "sans-serif"],
       },
     },
   },

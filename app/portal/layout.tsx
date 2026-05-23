@@ -12,10 +12,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!user) {
       const stored = localStorage.getItem('ss-user');
-      if (!stored) router.push('/');
+      if (!stored) { router.push('/'); return; }
     } else if (user.role === 'coach') {
       router.push('/coach/overview');
+      return;
     }
+    const onboardingDone = localStorage.getItem('ss-onboarding-done');
+    if (!onboardingDone) router.push('/onboarding');
   }, [user, router]);
 
   return (

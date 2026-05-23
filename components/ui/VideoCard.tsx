@@ -46,7 +46,7 @@ export default function VideoCard({ tag, title, meta }: VideoCardProps) {
         )}
         <div
           className="play-circle w-9 h-9 rounded-full flex items-center justify-center z-10 transition-transform duration-200"
-          style={{ background: 'rgba(22,196,90,0.85)' }}
+          style={{ background: 'var(--accent)' }}
         >
           <div
             className="ml-[2px]"

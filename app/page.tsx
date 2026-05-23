@@ -15,7 +15,7 @@ export default function LoginPage() {
       router.push('/coach/overview');
     } else {
       const onboardingDone = localStorage.getItem('ss-onboarding-done');
-      router.push(onboardingDone ? '/portal/home' : '/portal/onboarding');
+      router.push(onboardingDone ? '/portal/home' : '/onboarding');
     }
   };
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(22,196,90,0.06) 0%, transparent 70%)',
+            'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(32,182,35,0.06) 0%, transparent 70%)',
         }}
       />
 
@@ -113,7 +113,7 @@ export default function LoginPage() {
               const el = e.currentTarget as HTMLButtonElement;
               el.style.filter = 'brightness(1.08)';
               el.style.transform = 'translateY(-1px)';
-              el.style.boxShadow = '0 4px 16px rgba(22,196,90,0.3)';
+              el.style.boxShadow = '0 4px 16px rgba(32,182,35,0.3)';
             }}
             onMouseLeave={(e) => {
               const el = e.currentTarget as HTMLButtonElement;

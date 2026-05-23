@@ -82,9 +82,13 @@ export interface RevenueRow {
   status: 'In progress' | 'Complete';
 }
 
-export interface OnboardingVideo {
+export type OnboardingStepType = 'video' | 'doc' | 'action';
+
+export interface OnboardingStep {
   id: string;
+  type: OnboardingStepType;
   title: string;
-  duration: string;
   description: string;
+  duration?: string;
+  actionLabel?: string;
 }
