@@ -1,101 +1,140 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth, UserRole } from '@/context/AuthContext';
+
+export default function LoginPage() {
+  const [role, setRole] = useState<UserRole>('client');
+  const { login } = useAuth();
+  const router = useRouter();
+
+  const handleLogin = () => {
+    login(role);
+    if (role === 'coach') {
+      router.push('/coach/overview');
+    } else {
+      const onboardingDone = localStorage.getItem('ss-onboarding-done');
+      router.push(onboardingDone ? '/portal/home' : '/portal/onboarding');
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div
+      className="min-h-screen flex items-center justify-center relative"
+      style={{ background: 'var(--bg)' }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(22,196,90,0.06) 0%, transparent 70%)',
+        }}
+      />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      <div className="w-full max-w-[400px] px-5 relative z-10">
+        <div className="flex items-center gap-2.5 mb-9 justify-center">
+          <div
+            className="w-[34px] h-[34px] rounded-[8px] flex items-center justify-center font-serif text-[15px] text-white"
+            style={{ background: 'var(--accent)' }}
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            SS
+          </div>
+          <span className="font-serif text-[19px] tracking-[-0.3px]" style={{ color: 'var(--text)' }}>
+            SS Sustain
+          </span>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+        <div
+          className="rounded-[16px] p-8"
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border2)',
+            boxShadow: 'var(--shadow)',
+          }}
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+          <div
+            className="flex gap-1 mb-6 p-[3px] rounded-[8px]"
+            style={{ background: 'var(--bg3)' }}
+          >
+            {(['client', 'coach'] as UserRole[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRole(r)}
+                className="flex-1 py-[7px] px-3 rounded-[6px] text-[13px] font-medium capitalize transition-all duration-150"
+                style={
+                  role === r
+                    ? { background: 'var(--surface)', color: 'var(--text)', boxShadow: 'var(--shadow-sm)' }
+                    : { background: 'transparent', color: 'var(--text2)' }
+                }
+              >
+                {r === 'client' ? 'Client' : 'Coach'}
+              </button>
+            ))}
+          </div>
+
+          <h1 className="font-serif text-[26px] tracking-[-0.5px] mb-1.5" style={{ color: 'var(--text)' }}>
+            Welcome back
+          </h1>
+          <p className="text-[13px] mb-6" style={{ color: 'var(--text2)' }}>
+            Sign in to access your portal.
+          </p>
+
+          <label className="block text-[11px] font-semibold uppercase tracking-[0.8px] mb-1.5" style={{ color: 'var(--text3)' }}>
+            Email
+          </label>
+          <input
+            type="email"
+            placeholder="you@email.com"
+            className="w-full px-3.5 py-[11px] rounded-[9px] text-[14px] outline-none transition-colors duration-150 mb-3.5"
+            style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+            onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+            onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+
+          <label className="block text-[11px] font-semibold uppercase tracking-[0.8px] mb-1.5" style={{ color: 'var(--text3)' }}>
+            Password
+          </label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            className="w-full px-3.5 py-[11px] rounded-[9px] text-[14px] outline-none transition-colors duration-150 mb-3.5"
+            style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+            onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+            onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+          <button
+            onClick={handleLogin}
+            className="w-full py-3 rounded-[9px] text-white text-[14px] font-semibold tracking-[0.2px] mt-1 transition-all duration-200"
+            style={{ background: 'var(--accent)' }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.filter = 'brightness(1.08)';
+              el.style.transform = 'translateY(-1px)';
+              el.style.boxShadow = '0 4px 16px rgba(22,196,90,0.3)';
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLButtonElement;
+              el.style.filter = '';
+              el.style.transform = '';
+              el.style.boxShadow = '';
+            }}
+          >
+            Sign in
+          </button>
+
+          <p className="text-[12px] text-center mt-[18px] leading-[1.6]" style={{ color: 'var(--text3)' }}>
+            New client? Access is set up by your coach.
+            <br />
+            Get in touch at{' '}
+            <a href="mailto:coach@sssustain.com" style={{ color: 'var(--accent-text)', textDecoration: 'none' }}>
+              coach@sssustain.com
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
