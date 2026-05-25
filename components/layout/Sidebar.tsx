@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import SsLogo from '@/components/ui/SsLogo';
 
 export interface NavItem {
   label: string;
@@ -47,12 +48,7 @@ export default function Sidebar({
       {/* Brand + user */}
       <div className="px-4 pt-5 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex items-center gap-2.5 mb-3.5">
-          <div
-            className="w-7 h-7 rounded-[7px] flex items-center justify-center font-serif text-xs text-white"
-            style={{ background: 'var(--accent)' }}
-          >
-            SS
-          </div>
+          <SsLogo size={48} />
           <span className="font-serif text-[16px] tracking-[-0.3px]" style={{ color: 'var(--text)' }}>
             SS Sustain
           </span>

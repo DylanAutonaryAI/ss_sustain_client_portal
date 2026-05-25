@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onboardingSteps } from '@/lib/mock-data/onboarding';
+import SsLogo from '@/components/ui/SsLogo';
 
 export default function OnboardingPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -43,12 +44,7 @@ export default function OnboardingPage() {
         style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar-bg)' }}
       >
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-[32px] h-[32px] rounded-[7px] flex items-center justify-center text-[13px] font-bold text-white"
-            style={{ background: 'var(--accent)' }}
-          >
-            SS
-          </div>
+          <SsLogo size={48} />
           <span className="font-serif text-[17px]" style={{ color: 'var(--text)' }}>SS Sustain</span>
         </div>
         <span className="text-[12px] font-semibold" style={{ color: 'var(--text3)' }}>

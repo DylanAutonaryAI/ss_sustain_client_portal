@@ -1,6 +1,13 @@
+'use client';
+
 import Topbar from '@/components/layout/Topbar';
-import VideoCard from '@/components/ui/VideoCard';
-import { posingVideos, posingTips } from '@/lib/mock-data/training';
+import { posingTips } from '@/lib/mock-data/training';
+
+const posingVideoIds = [
+  { id: 'NrBibnwAbrI', label: 'Posing Clip 1' },
+  { id: 'kJMK1vV7wRI', label: 'Posing Clip 2' },
+  { id: '33GezNhiD8I', label: 'Posing Clip 3' },
+];
 
 export default function PosingPage() {
   return (
@@ -18,8 +25,37 @@ export default function PosingPage() {
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Pose tutorials</span>
         </div>
         <div className="grid grid-cols-3 gap-3 mb-6">
-          {posingVideos.map((v) => (
-            <VideoCard key={v.id} tag={v.tag} title={v.title} meta={v.meta} />
+          {posingVideoIds.map((v) => (
+            <div
+              key={v.id}
+              className="rounded-[10px] overflow-hidden"
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
+              <div className="relative" style={{ paddingTop: '177.78%' /* 9:16 aspect for Shorts */ }}>
+                <iframe
+                  src={`https://www.youtube.com/embed/${v.id}`}
+                  title={v.label}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    border: 0,
+                  }}
+                />
+              </div>
+              <div className="px-3 py-2.5">
+                <p className="text-[12px] font-medium" style={{ color: 'var(--text)' }}>{v.label}</p>
+                <p className="text-[11px]" style={{ color: 'var(--text3)' }}>YouTube Shorts</p>
+              </div>
+            </div>
           ))}
         </div>
 

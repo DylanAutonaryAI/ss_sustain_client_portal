@@ -4,18 +4,26 @@ interface VideoCardProps {
   tag: string;
   title: string;
   meta: string;
+  url?: string;
 }
 
-export default function VideoCard({ tag, title, meta }: VideoCardProps) {
+export default function VideoCard({ tag, title, meta, url }: VideoCardProps) {
+  const handleClick = () => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div
-      className="rounded-[10px] overflow-hidden cursor-pointer transition-all duration-150"
+      className="rounded-[10px] overflow-hidden transition-all duration-150"
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         boxShadow: 'var(--shadow-sm)',
+        cursor: url ? 'pointer' : 'default',
       }}
+      onClick={handleClick}
       onMouseEnter={(e) => {
+        if (!url) return;
         const el = e.currentTarget as HTMLDivElement;
         el.style.borderColor = 'var(--accent-mid)';
         el.style.transform = 'translateY(-2px)';
@@ -24,6 +32,7 @@ export default function VideoCard({ tag, title, meta }: VideoCardProps) {
         if (circle) circle.style.transform = 'scale(1.08)';
       }}
       onMouseLeave={(e) => {
+        if (!url) return;
         const el = e.currentTarget as HTMLDivElement;
         el.style.borderColor = 'var(--border)';
         el.style.transform = 'translateY(0)';
@@ -46,7 +55,7 @@ export default function VideoCard({ tag, title, meta }: VideoCardProps) {
         )}
         <div
           className="play-circle w-9 h-9 rounded-full flex items-center justify-center z-10 transition-transform duration-200"
-          style={{ background: 'var(--accent)' }}
+          style={{ background: url ? 'var(--accent)' : 'var(--border2)' }}
         >
           <div
             className="ml-[2px]"

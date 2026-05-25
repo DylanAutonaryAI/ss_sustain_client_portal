@@ -12,6 +12,7 @@ export interface VideoClip {
   tag: string;
   title: string;
   meta: string;
+  url?: string;
 }
 
 export interface Supplement {
@@ -38,12 +39,14 @@ export interface Webinar {
   recorded?: boolean;
   recordedDate?: string;
   tag?: string;
+  url?: string;
 }
 
 export interface PdfResource {
   id: string;
   title: string;
   meta: string;
+  url?: string;
 }
 
 export interface CoachMessage {

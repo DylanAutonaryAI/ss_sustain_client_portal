@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, UserRole } from '@/context/AuthContext';
+import SsLogo from '@/components/ui/SsLogo';
 
 export default function LoginPage() {
   const [role, setRole] = useState<UserRole>('client');
@@ -34,12 +35,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-[400px] px-5 relative z-10">
         <div className="flex items-center gap-2.5 mb-9 justify-center">
-          <div
-            className="w-[34px] h-[34px] rounded-[8px] flex items-center justify-center font-serif text-[15px] text-white"
-            style={{ background: 'var(--accent)' }}
-          >
-            SS
-          </div>
+          <SsLogo size={48} />
           <span className="font-serif text-[19px] tracking-[-0.3px]" style={{ color: 'var(--text)' }}>
             SS Sustain
           </span>

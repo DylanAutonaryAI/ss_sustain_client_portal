@@ -3,9 +3,9 @@
 import type { PdfResource } from '@/lib/types';
 
 export default function PdfRow({ pdf }: { pdf: PdfResource }) {
-  return (
+  const content = (
     <div
-      className="flex items-center gap-3.5 px-[18px] py-3.5 rounded-[10px] mb-2 cursor-pointer transition-all duration-150"
+      className="flex items-center gap-3.5 px-[18px] py-3.5 rounded-[10px] mb-2 transition-all duration-150"
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
@@ -29,4 +29,14 @@ export default function PdfRow({ pdf }: { pdf: PdfResource }) {
       </span>
     </div>
   );
+
+  if (pdf.url) {
+    return (
+      <a href={pdf.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', display: 'block', cursor: 'pointer' }}>
+        {content}
+      </a>
+    );
+  }
+
+  return <div style={{ cursor: 'default', opacity: 0.5 }}>{content}</div>;
 }

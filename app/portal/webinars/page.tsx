@@ -1,7 +1,6 @@
 import Topbar from '@/components/layout/Topbar';
-import WebinarRow from '@/components/ui/WebinarRow';
 import VideoCard from '@/components/ui/VideoCard';
-import { upcomingWebinars, recordedWebinars } from '@/lib/mock-data/webinars';
+import { recordedWebinars } from '@/lib/mock-data/webinars';
 
 export default function WebinarsPage() {
   return (
@@ -12,24 +11,16 @@ export default function WebinarsPage() {
           Webinar <em className="italic" style={{ color: 'var(--accent-text)' }}>Hub</em>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
-          Live sessions and recorded deep dives.
+          Recorded deep dives from Sam. Click any to watch on Loom.
         </p>
 
         <div className="flex items-center justify-between mb-3">
-          <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Upcoming</span>
-        </div>
-        {upcomingWebinars.map((w) => (
-          <WebinarRow key={w.id} webinar={w} />
-        ))}
-
-        <div className="h-px my-6" style={{ background: 'var(--border)' }} />
-
-        <div className="flex items-center justify-between mb-3">
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Recorded sessions</span>
+          <span className="text-[11px] font-semibold" style={{ color: 'var(--text3)' }}>{recordedWebinars.length} videos</span>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {recordedWebinars.map((w) => (
-            <VideoCard key={w.id} tag={w.tag ?? ''} title={w.title} meta={w.meta} />
+            <VideoCard key={w.id} tag={w.tag ?? ''} title={w.title} meta={w.meta} url={w.url} />
           ))}
         </div>
       </div>
