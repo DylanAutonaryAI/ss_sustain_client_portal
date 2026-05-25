@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import AnnounceStrip from '@/components/ui/AnnounceStrip';
 import ResourceRow from '@/components/ui/ResourceRow';
@@ -7,6 +8,8 @@ import { Icons } from '@/components/layout/icons';
 import { announcements } from '@/lib/mock-data/announcements';
 
 export default function HomePage() {
+  const [photoRefOpen, setPhotoRefOpen] = useState(false);
+
   return (
     <>
       <Topbar title="Home" statusLabel="Bulk · Week 8" />
@@ -23,57 +26,54 @@ export default function HomePage() {
         ))}
 
         {/* Weekly check-in card */}
-        <a
-          href="/pdfs/check-in-process.pdf"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ textDecoration: 'none', display: 'block', marginTop: 20 }}
-        >
-          <div
-            className="flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-150"
-            style={{
-              background: 'var(--accent-dim)',
-              border: '1px solid var(--accent-mid)',
-              boxShadow: 'var(--shadow-sm)',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent-mid)'; }}
-          >
-            <div
-              className="w-10 h-10 rounded-[10px] flex items-center justify-center text-[20px] flex-shrink-0"
-              style={{ background: 'var(--accent)', boxShadow: '0 2px 8px rgba(32,182,35,0.35)' }}
-            >
-              📋
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-semibold mb-0.5" style={{ color: 'var(--text)' }}>
-                Weekly Check-In Guide
-              </p>
-              <p className="text-[12px]" style={{ color: 'var(--text2)' }}>
-                Photos, metrics and summary — how to complete your check-in correctly
-              </p>
-            </div>
-            <span className="text-[12px] font-semibold flex-shrink-0" style={{ color: 'var(--accent-text)' }}>
-              Open PDF →
-            </span>
-          </div>
-        </a>
-
-        {/* Progress picture reference */}
         <div
-          className="mt-3 rounded-xl overflow-hidden"
-          style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+          className="mt-5 rounded-xl overflow-hidden"
+          style={{ border: '1px solid var(--accent-mid)', boxShadow: 'var(--shadow-sm)', background: 'var(--accent-dim)' }}
         >
-          <div className="px-4 py-2.5" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.6px]" style={{ color: 'var(--text3)' }}>
-              Progress picture reference
-            </p>
-          </div>
-          <img
-            src="/images/progress-picture-references.png"
-            alt="Progress picture references — front, side and back shot"
-            style={{ width: '100%', display: 'block' }}
-          />
+          {/* Header row — opens PDF */}
+          <a
+            href="/pdfs/check-in-process.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: 'none', display: 'block' }}
+          >
+            <div className="flex items-center gap-4 px-5 py-3.5">
+              <div
+                className="w-9 h-9 rounded-[9px] flex items-center justify-center text-[18px] flex-shrink-0"
+                style={{ background: 'var(--accent)', boxShadow: '0 2px 8px rgba(32,182,35,0.3)' }}
+              >
+                📋
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold" style={{ color: 'var(--text)' }}>Weekly Check-In Guide</p>
+                <p className="text-[11px]" style={{ color: 'var(--text2)' }}>Photos, metrics and summary</p>
+              </div>
+              <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: 'var(--accent-text)' }}>Open PDF →</span>
+            </div>
+          </a>
+
+          {/* Photo reference toggle */}
+          <button
+            onClick={() => setPhotoRefOpen(o => !o)}
+            className="w-full flex items-center justify-between px-5 py-2 text-left transition-colors duration-150"
+            style={{ background: 'var(--accent-dim)', borderTop: '1px solid var(--accent-mid)', borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer' }}
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>
+              Progress photo reference
+            </span>
+            <span className="text-[11px]" style={{ color: 'var(--text3)', transform: photoRefOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.2s' }}>▼</span>
+          </button>
+
+          {/* Collapsible image */}
+          {photoRefOpen && (
+            <div style={{ borderTop: '1px solid var(--accent-mid)' }}>
+              <img
+                src="/images/progress-picture-references.png"
+                alt="Progress picture references — front, side and back shot"
+                style={{ width: '70%', display: 'block', margin: '0 auto', padding: '12px 0' }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="h-px my-6" style={{ background: 'var(--border)' }} />
