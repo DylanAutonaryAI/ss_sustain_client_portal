@@ -21,6 +21,7 @@ export interface Supplement {
   name: string;
   description: string;
   essential: boolean;
+  url?: string;
 }
 
 export interface Recommendation {

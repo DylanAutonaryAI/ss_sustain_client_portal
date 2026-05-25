@@ -7,6 +7,7 @@ export const supplements: Supplement[] = [
     name: 'Multivitamin',
     description: '1 per day — building blocks of the body, helps maintain good health.',
     essential: true,
+    url: 'https://www.bulk.com/uk/multivitamin-multimineral.html',
   },
   {
     id: '2',
@@ -14,6 +15,7 @@ export const supplements: Supplement[] = [
     name: 'Omega 3',
     description: '1 per day — binds to receptors in cells that regulate genetic function.',
     essential: true,
+    url: 'https://www.bulk.com/uk/omega-3-fish-oil-softgels.html',
   },
   {
     id: '3',
@@ -21,6 +23,7 @@ export const supplements: Supplement[] = [
     name: 'Vitamin D',
     description: '1 per day — bone health and immune support; provides what the sun provides.',
     essential: true,
+    url: 'https://www.bulk.com/uk/vitamin-d3-tablets.html',
   },
   {
     id: '4',
@@ -28,6 +31,7 @@ export const supplements: Supplement[] = [
     name: 'Vitamin C',
     description: '1 per day — protects cells, maintains healthy skin, blood vessels, bones and cartilage.',
     essential: true,
+    url: 'https://www.bulk.com/uk/vitamin-c-tablets-1000mg.html',
   },
   {
     id: '5',
@@ -35,6 +39,7 @@ export const supplements: Supplement[] = [
     name: 'Whey Isolate',
     description: '1–2 scoops per day (diet dependant) — recovery, lean muscle building and fat loss benefits.',
     essential: true,
+    url: 'https://www.bulk.com/uk/pure-whey-isolate-90.html',
   },
   {
     id: '6',
@@ -42,6 +47,7 @@ export const supplements: Supplement[] = [
     name: 'Creatine',
     description: '5g per day — increases physical performance in successive bursts of short-term high intensity exercise.',
     essential: true,
+    url: 'https://www.bulk.com/uk/creatine-monohydrate.html',
   },
   {
     id: '7',
@@ -49,6 +55,7 @@ export const supplements: Supplement[] = [
     name: 'Digest Enzyme',
     description: '1 per day — aids digestion of protein, carbohydrates, fat and fibre.',
     essential: false,
+    url: 'https://www.bulk.com/uk/digezyme-tablets-150mg.html',
   },
   {
     id: '8',
@@ -56,6 +63,7 @@ export const supplements: Supplement[] = [
     name: 'Cod Liver Oil',
     description: '1 per day — ideal supplement for both heart health and joints.',
     essential: false,
+    url: 'https://www.bulk.com/uk/cod-liver-oil-softgels.html',
   },
   {
     id: '9',
@@ -63,6 +71,7 @@ export const supplements: Supplement[] = [
     name: 'Electrolytes',
     description: '1g per day — regulate pH levels and muscles, keep you hydrated.',
     essential: false,
+    url: 'https://www.bulk.com/uk/electrolyte-powder.html',
   },
   {
     id: '10',
@@ -70,6 +79,7 @@ export const supplements: Supplement[] = [
     name: 'Krill Oil',
     description: '1 per day — improves general health, post-exercise immune function, muscular strength and athletic performance.',
     essential: false,
+    url: 'https://www.bulk.com/uk/krill-oil-softgels.html',
   },
   {
     id: '11',
@@ -77,6 +87,7 @@ export const supplements: Supplement[] = [
     name: 'COQ10',
     description: '1 per day — helps with muscle growth and muscle strength.',
     essential: false,
+    url: 'https://www.bulk.com/uk/co-enzyme-q10-capsules-50mg.html',
   },
   {
     id: '12',
@@ -84,5 +95,6 @@ export const supplements: Supplement[] = [
     name: "EAA's",
     description: '15g per day intra-workout — 9 essential amino acids for energy, muscle building, strength and boosted metabolism.',
     essential: false,
+    url: 'https://www.bulk.com/uk/essential-amino-acids.html',
   },
 ];
