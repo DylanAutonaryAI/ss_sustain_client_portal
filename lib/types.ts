@@ -86,6 +86,34 @@ export interface RevenueRow {
   status: 'In progress' | 'Complete';
 }
 
+export interface MindsetTip {
+  id: string;
+  title: string;
+  body: string;
+}
+
+export interface GymBagItem {
+  id: string;
+  name: string;
+  desc: string;
+  linkLabel: string;
+  linkUrl: string;
+}
+
+export type ShoppingCategory = 'Protein' | 'Carbs' | 'Fats' | 'Other';
+
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  category: ShoppingCategory;
+}
+
+export interface NonNegotiable {
+  id: string;
+  label: string;
+  desc: string;
+}
+
 export type OnboardingStepType = 'video' | 'doc' | 'action';
 
 export interface OnboardingStep {

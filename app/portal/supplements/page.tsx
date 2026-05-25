@@ -1,8 +1,11 @@
+'use client';
+
 import Topbar from '@/components/layout/Topbar';
 import SupplementRow from '@/components/ui/SupplementRow';
-import { supplements } from '@/lib/mock-data/supplements';
+import { useContent } from '@/context/ContentContext';
 
 export default function SupplementsPage() {
+  const { supplements } = useContent();
   const essential = supplements.filter((s) => s.essential);
   const optional  = supplements.filter((s) => !s.essential);
 
@@ -28,6 +31,7 @@ export default function SupplementsPage() {
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Optional add-ons</span>
         </div>
         {optional.map((s) => <SupplementRow key={s.id} supp={s} />)}
+        {optional.length === 0 && <p className="text-[13px]" style={{ color: 'var(--text3)' }}>No optional supplements added.</p>}
       </div>
     </>
   );

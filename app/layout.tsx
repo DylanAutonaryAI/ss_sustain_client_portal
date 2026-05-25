@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { ContentProvider } from "@/context/ContentContext";
 
 export const metadata: Metadata = {
   title: "SS Sustain — Client Portal",
@@ -26,7 +27,9 @@ export default function RootLayout({
       <body className="font-sans">
         <ThemeProvider>
           <AuthProvider>
-            {children}
+            <ContentProvider>
+              {children}
+            </ContentProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
