@@ -135,4 +135,5 @@ export interface OnboardingStep {
   description: string;
   duration?: string;
   actionLabel?: string;
+  url?: string;
 }

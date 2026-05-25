@@ -152,7 +152,10 @@ export default function OnboardingPage() {
             <div className="flex items-center gap-3 flex-wrap">
               {!isLastStep || !canEnter ? (
                 <button
-                  onClick={completeStep}
+                  onClick={() => {
+                    if (step.url && !isComplete) window.open(step.url, '_blank', 'noopener,noreferrer');
+                    completeStep();
+                  }}
                   disabled={isComplete}
                   className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-default"
                   style={{ background: 'var(--accent)' }}

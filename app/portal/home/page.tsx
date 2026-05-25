@@ -19,6 +19,43 @@ export default function HomePage() {
           <AnnounceStrip key={a.id} announcement={a} />
         ))}
 
+        {/* Weekly check-in card */}
+        <a
+          href="/pdfs/check-in-process.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ textDecoration: 'none', display: 'block', marginTop: 20 }}
+        >
+          <div
+            className="flex items-center gap-4 px-5 py-4 rounded-xl transition-all duration-150"
+            style={{
+              background: 'var(--accent-dim)',
+              border: '1px solid var(--accent-mid)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--accent-mid)'; }}
+          >
+            <div
+              className="w-10 h-10 rounded-[10px] flex items-center justify-center text-[20px] flex-shrink-0"
+              style={{ background: 'var(--accent)', boxShadow: '0 2px 8px rgba(32,182,35,0.35)' }}
+            >
+              📋
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-semibold mb-0.5" style={{ color: 'var(--text)' }}>
+                Weekly Check-In Guide
+              </p>
+              <p className="text-[12px]" style={{ color: 'var(--text2)' }}>
+                Photos, metrics and summary — how to complete your check-in correctly
+              </p>
+            </div>
+            <span className="text-[12px] font-semibold flex-shrink-0" style={{ color: 'var(--accent-text)' }}>
+              Open PDF →
+            </span>
+          </div>
+        </a>
+
         <div className="h-px my-6" style={{ background: 'var(--border)' }} />
 
         <div className="flex items-center justify-between mb-3.5">
