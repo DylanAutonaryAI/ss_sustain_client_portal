@@ -1,3 +1,5 @@
+'use client';
+
 import Topbar from '@/components/layout/Topbar';
 import AnnounceStrip from '@/components/ui/AnnounceStrip';
 import ResourceRow from '@/components/ui/ResourceRow';
