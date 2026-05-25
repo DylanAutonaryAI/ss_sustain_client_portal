@@ -3,6 +3,7 @@
 import Topbar from '@/components/layout/Topbar';
 import AnnounceStrip from '@/components/ui/AnnounceStrip';
 import ResourceRow from '@/components/ui/ResourceRow';
+import { Icons } from '@/components/layout/icons';
 import { announcements } from '@/lib/mock-data/announcements';
 
 export default function HomePage() {
@@ -58,6 +59,23 @@ export default function HomePage() {
           </div>
         </a>
 
+        {/* Progress picture reference */}
+        <div
+          className="mt-3 rounded-xl overflow-hidden"
+          style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+        >
+          <div className="px-4 py-2.5" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.6px]" style={{ color: 'var(--text3)' }}>
+              Progress picture reference
+            </p>
+          </div>
+          <img
+            src="/images/progress-picture-references.png"
+            alt="Progress picture references — front, side and back shot"
+            style={{ width: '100%', display: 'block' }}
+          />
+        </div>
+
         <div className="h-px my-6" style={{ background: 'var(--border)' }} />
 
         <div className="flex items-center justify-between mb-3.5">
@@ -67,10 +85,36 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <ResourceRow icon="💬" title="Coach Messages"  subtitle="2 new from your coach" />
-          <ResourceRow icon="🎬" title="Training Clips"  subtitle="New form guides this week" />
-          <ResourceRow icon="🧠" title="Mindset Area"    subtitle="Tips, roadmap & identity work" />
-          <ResourceRow icon="📺" title="Webinars"        subtitle="Nutrition deep dive — Apr 20" />
+          <ResourceRow
+            icon={Icons.message}
+            title="Coach Messages"
+            subtitle="2 new from your coach"
+            href="/portal/messages"
+            badge={2}
+            color="#20B623"
+          />
+          <ResourceRow
+            icon={Icons.barbell}
+            title="Training Clips"
+            subtitle="New form guides this week"
+            href="/portal/training"
+            badge="New"
+            color="#3b82f6"
+          />
+          <ResourceRow
+            icon={Icons.brain}
+            title="Mindset Area"
+            subtitle="Tips, roadmap & identity work"
+            href="/portal/mindset"
+            color="#8b5cf6"
+          />
+          <ResourceRow
+            icon={Icons.monitor}
+            title="Webinars"
+            subtitle="Nutrition deep dive — Apr 20"
+            href="/portal/webinars"
+            color="#f59e0b"
+          />
         </div>
       </div>
     </>
