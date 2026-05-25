@@ -1,8 +1,12 @@
+'use client';
+
 import Topbar from '@/components/layout/Topbar';
 import PdfRow from '@/components/ui/PdfRow';
-import { pdfResources } from '@/lib/mock-data/library';
+import { useContent } from '@/context/ContentContext';
 
 export default function LibraryPage() {
+  const { pdfResources } = useContent();
+
   return (
     <>
       <Topbar title="Resource Library" statusLabel="Bulk · Week 8" />
@@ -13,9 +17,13 @@ export default function LibraryPage() {
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
           PDFs, guides and downloads — all in one place.
         </p>
-        {pdfResources.map((pdf) => (
-          <PdfRow key={pdf.id} pdf={pdf} />
-        ))}
+        {pdfResources.length > 0 ? (
+          pdfResources.map((pdf) => <PdfRow key={pdf.id} pdf={pdf} />)
+        ) : (
+          <div className="rounded-xl px-6 py-8 text-center" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <p className="text-[13px]" style={{ color: 'var(--text3)' }}>No resources added yet.</p>
+          </div>
+        )}
       </div>
     </>
   );

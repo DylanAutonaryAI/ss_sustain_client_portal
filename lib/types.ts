@@ -114,6 +114,18 @@ export interface NonNegotiable {
   desc: string;
 }
 
+export interface PosingVideo {
+  id: string;
+  label: string;
+  youtubeUrl: string;
+}
+
+export interface PosingTip {
+  id: string;
+  key: string;
+  body: string;
+}
+
 export type OnboardingStepType = 'video' | 'doc' | 'action';
 
 export interface OnboardingStep {

@@ -3,16 +3,21 @@
 import { useState } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { useContent } from '@/context/ContentContext';
-import type { Supplement, MindsetTip, GymBagItem, ShoppingItem, ShoppingCategory, NonNegotiable } from '@/lib/types';
+import type { Supplement, MindsetTip, GymBagItem, ShoppingItem, ShoppingCategory, NonNegotiable, Webinar, VideoClip, PdfResource, PosingVideo, PosingTip } from '@/lib/types';
 
-type Tab = 'supplements' | 'mindset' | 'gymbag' | 'shopping' | 'nonneg';
+type Tab = 'supplements' | 'mindset' | 'webinars' | 'training' | 'posingvids' | 'posingtips' | 'library' | 'gymbag' | 'shopping' | 'nonneg';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'supplements', label: 'Supplements' },
-  { id: 'mindset',     label: 'Mindset Tips' },
-  { id: 'gymbag',      label: 'Gym Bag' },
-  { id: 'shopping',    label: 'Shopping' },
-  { id: 'nonneg',      label: 'Non-Negotiables' },
+  { id: 'webinars',   label: 'Webinars' },
+  { id: 'training',   label: 'Training Vids' },
+  { id: 'posingvids', label: 'Posing Vids' },
+  { id: 'posingtips', label: 'Posing Tips' },
+  { id: 'library',    label: 'Library' },
+  { id: 'supplements',label: 'Supplements' },
+  { id: 'mindset',    label: 'Mindset' },
+  { id: 'gymbag',     label: 'Gym Bag' },
+  { id: 'shopping',   label: 'Shopping' },
+  { id: 'nonneg',     label: 'Non-Neg' },
 ];
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
@@ -360,10 +365,291 @@ function NonNegEditor() {
   );
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function extractYouTubeId(input: string): string {
+  const m1 = input.match(/shorts\/([a-zA-Z0-9_-]+)/);  if (m1) return m1[1];
+  const m2 = input.match(/[?&]v=([a-zA-Z0-9_-]+)/);    if (m2) return m2[1];
+  const m3 = input.match(/youtu\.be\/([a-zA-Z0-9_-]+)/); if (m3) return m3[1];
+  return input.trim();
+}
+
+// ─── Webinars Editor ──────────────────────────────────────────────────────────
+
+const WEBINAR_TAGS = ['Nutrition', 'Training', 'Mindset', 'Recovery', 'Lifestyle', 'Team Call'];
+
+function WebinarsEditor() {
+  const { webinars, setWebinars } = useContent();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const blank = (): Omit<Webinar, 'id'> => ({ month: '', day: '', title: '', meta: 'Loom · Full recording', tag: 'Training', recorded: true, url: '' });
+  const [draft, setDraft] = useState(blank());
+
+  const startEdit = (w: Webinar) => { setAddOpen(false); setEditingId(w.id); setDraft({ month: w.month, day: w.day, title: w.title, meta: w.meta, tag: w.tag, recorded: w.recorded, url: w.url ?? '' }); };
+  const saveEdit = () => {
+    if (!draft.title.trim()) return;
+    setWebinars(webinars.map(w => w.id === editingId ? { ...w, ...draft } : w));
+    setEditingId(null);
+  };
+  const saveAdd = () => {
+    if (!draft.title.trim()) return;
+    setWebinars([...webinars, { id: `web-${Date.now()}`, ...draft }]);
+    setAddOpen(false);
+  };
+  const remove = (id: string) => setWebinars(webinars.filter(w => w.id !== id));
+
+  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+    <FormCard>
+      <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Fat Loss Fundamentals" style={inputStyle} /></Field>
+      <Field label="Video URL (Loom, YouTube, etc.)"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="https://www.loom.com/share/..." style={inputStyle} /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Field label="Tag / Category">
+          <select value={draft.tag ?? 'Training'} onChange={e => setDraft(d => ({ ...d, tag: e.target.value }))} style={inputStyle}>
+            {WEBINAR_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </Field>
+        <Field label="Meta (display text)"><input value={draft.meta} onChange={e => setDraft(d => ({ ...d, meta: e.target.value }))} placeholder="Loom · Full recording" style={inputStyle} /></Field>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}><SaveBtn onClick={onSave} /><CancelBtn onClick={onCancel} /></div>
+    </FormCard>
+  );
+
+  return (
+    <div>
+      {webinars.map(w => editingId === w.id ? (
+        <Form key={w.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+      ) : (
+        <ItemRow key={w.id}>
+          <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)', flexShrink: 0 }}>{w.tag ?? 'Video'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{w.title}</p>
+            {w.url && <p style={{ fontSize: 11, color: 'var(--text3)' }}>{w.url.slice(0, 60)}{w.url.length > 60 ? '…' : ''}</p>}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}><EditBtn onClick={() => startEdit(w)} /><RemoveBtn onClick={() => remove(w.id)} /></div>
+        </ItemRow>
+      ))}
+      {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Webinar" />}
+      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+    </div>
+  );
+}
+
+// ─── Training Videos Editor ───────────────────────────────────────────────────
+
+function TrainingVideosEditor() {
+  const { trainingVideos, setTrainingVideos } = useContent();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const blank = (): Omit<VideoClip, 'id'> => ({ tag: '', title: '', meta: '', url: '' });
+  const [draft, setDraft] = useState(blank());
+
+  const startEdit = (v: VideoClip) => { setAddOpen(false); setEditingId(v.id); setDraft({ tag: v.tag, title: v.title, meta: v.meta, url: v.url ?? '' }); };
+  const saveEdit = () => {
+    if (!draft.title.trim()) return;
+    setTrainingVideos(trainingVideos.map(v => v.id === editingId ? { ...v, ...draft } : v));
+    setEditingId(null);
+  };
+  const saveAdd = () => {
+    if (!draft.title.trim()) return;
+    setTrainingVideos([...trainingVideos, { id: `train-${Date.now()}`, ...draft }]);
+    setAddOpen(false);
+  };
+  const remove = (id: string) => setTrainingVideos(trainingVideos.filter(v => v.id !== id));
+
+  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+    <FormCard>
+      <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Incline DB Press — Full Form Guide" style={inputStyle} /></Field>
+      <Field label="Video URL (YouTube, Loom, etc.)"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="https://..." style={inputStyle} /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Field label="Tag (muscle group)"><input value={draft.tag} onChange={e => setDraft(d => ({ ...d, tag: e.target.value }))} placeholder="e.g. Chest" style={inputStyle} /></Field>
+        <Field label="Meta"><input value={draft.meta} onChange={e => setDraft(d => ({ ...d, meta: e.target.value }))} placeholder="e.g. Upper chest · 8 min" style={inputStyle} /></Field>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}><SaveBtn onClick={onSave} /><CancelBtn onClick={onCancel} /></div>
+    </FormCard>
+  );
+
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12, lineHeight: 1.6 }}>
+        Reference / demo videos that appear at the top of the Training Clips page for clients to watch.
+      </p>
+      {trainingVideos.map(v => editingId === v.id ? (
+        <Form key={v.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+      ) : (
+        <ItemRow key={v.id}>
+          {v.tag && <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)', flexShrink: 0 }}>{v.tag}</span>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{v.title}</p>
+            <p style={{ fontSize: 11, color: 'var(--text3)' }}>{v.meta}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}><EditBtn onClick={() => startEdit(v)} /><RemoveBtn onClick={() => remove(v.id)} /></div>
+        </ItemRow>
+      ))}
+      {trainingVideos.length === 0 && !addOpen && <p style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0' }}>No reference videos added yet.</p>}
+      {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Training Video" />}
+      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+    </div>
+  );
+}
+
+// ─── Posing Videos Editor ─────────────────────────────────────────────────────
+
+function PosingVideosEditor() {
+  const { posingVideos, setPosingVideos } = useContent();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const blank = (): Omit<PosingVideo, 'id'> => ({ label: '', youtubeUrl: '' });
+  const [draft, setDraft] = useState(blank());
+
+  const startEdit = (v: PosingVideo) => { setAddOpen(false); setEditingId(v.id); setDraft({ label: v.label, youtubeUrl: v.youtubeUrl }); };
+  const saveEdit = () => {
+    if (!draft.youtubeUrl.trim()) return;
+    setPosingVideos(posingVideos.map(v => v.id === editingId ? { ...v, ...draft } : v));
+    setEditingId(null);
+  };
+  const saveAdd = () => {
+    if (!draft.youtubeUrl.trim()) return;
+    setPosingVideos([...posingVideos, { id: `pv-${Date.now()}`, ...draft }]);
+    setAddOpen(false);
+  };
+  const remove = (id: string) => setPosingVideos(posingVideos.filter(v => v.id !== id));
+
+  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+    <FormCard>
+      <Field label="YouTube URL or Video ID"><input value={draft.youtubeUrl} onChange={e => setDraft(d => ({ ...d, youtubeUrl: e.target.value }))} placeholder="https://www.youtube.com/shorts/..." style={inputStyle} /></Field>
+      <Field label="Label (displayed below video)"><input value={draft.label} onChange={e => setDraft(d => ({ ...d, label: e.target.value }))} placeholder="e.g. Front Double Bicep" style={inputStyle} /></Field>
+      {draft.youtubeUrl && (
+        <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 10 }}>
+          Video ID: <strong style={{ color: 'var(--accent-text)' }}>{extractYouTubeId(draft.youtubeUrl)}</strong>
+        </p>
+      )}
+      <div style={{ display: 'flex', gap: 8 }}><SaveBtn onClick={onSave} /><CancelBtn onClick={onCancel} /></div>
+    </FormCard>
+  );
+
+  return (
+    <div>
+      {posingVideos.map(v => editingId === v.id ? (
+        <Form key={v.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+      ) : (
+        <ItemRow key={v.id}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{v.label || '(no label)'}</p>
+            <p style={{ fontSize: 11, color: 'var(--text3)' }}>ID: {extractYouTubeId(v.youtubeUrl)}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}><EditBtn onClick={() => startEdit(v)} /><RemoveBtn onClick={() => remove(v.id)} /></div>
+        </ItemRow>
+      ))}
+      {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Posing Video" />}
+      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+    </div>
+  );
+}
+
+// ─── Posing Tips Editor ───────────────────────────────────────────────────────
+
+function PosingTipsEditor() {
+  const { posingTips, setPosingTips } = useContent();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const blank = (): Omit<PosingTip, 'id'> => ({ key: '', body: '' });
+  const [draft, setDraft] = useState(blank());
+
+  const startEdit = (t: PosingTip) => { setAddOpen(false); setEditingId(t.id); setDraft({ key: t.key, body: t.body }); };
+  const saveEdit = () => {
+    if (!draft.key.trim()) return;
+    setPosingTips(posingTips.map(t => t.id === editingId ? { ...t, ...draft } : t));
+    setEditingId(null);
+  };
+  const saveAdd = () => {
+    if (!draft.key.trim()) return;
+    setPosingTips([...posingTips, { id: `pt-${Date.now()}`, ...draft }]);
+    setAddOpen(false);
+  };
+  const remove = (id: string) => setPosingTips(posingTips.filter(t => t.id !== id));
+
+  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+    <FormCard>
+      <Field label="Key / Title"><input value={draft.key} onChange={e => setDraft(d => ({ ...d, key: e.target.value }))} placeholder="e.g. Vacuum" style={inputStyle} /></Field>
+      <Field label="Tip Body"><textarea value={draft.body} onChange={e => setDraft(d => ({ ...d, body: e.target.value }))} placeholder="Describe the coaching tip..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} /></Field>
+      <div style={{ display: 'flex', gap: 8 }}><SaveBtn onClick={onSave} /><CancelBtn onClick={onCancel} /></div>
+    </FormCard>
+  );
+
+  return (
+    <div>
+      {posingTips.map(t => editingId === t.id ? (
+        <Form key={t.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+      ) : (
+        <ItemRow key={t.id}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{t.key}</p>
+            <p style={{ fontSize: 11, color: 'var(--text3)' }}>{t.body.slice(0, 90)}{t.body.length > 90 ? '…' : ''}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}><EditBtn onClick={() => startEdit(t)} /><RemoveBtn onClick={() => remove(t.id)} /></div>
+        </ItemRow>
+      ))}
+      {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Tip" />}
+      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+    </div>
+  );
+}
+
+// ─── Library Editor ───────────────────────────────────────────────────────────
+
+function LibraryEditor() {
+  const { pdfResources, setPdfResources } = useContent();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const blank = (): Omit<PdfResource, 'id'> => ({ title: '', meta: 'PDF', url: '' });
+  const [draft, setDraft] = useState(blank());
+
+  const startEdit = (p: PdfResource) => { setAddOpen(false); setEditingId(p.id); setDraft({ title: p.title, meta: p.meta, url: p.url ?? '' }); };
+  const saveEdit = () => {
+    if (!draft.title.trim()) return;
+    setPdfResources(pdfResources.map(p => p.id === editingId ? { ...p, ...draft } : p));
+    setEditingId(null);
+  };
+  const saveAdd = () => {
+    if (!draft.title.trim()) return;
+    setPdfResources([...pdfResources, { id: `pdf-${Date.now()}`, ...draft }]);
+    setAddOpen(false);
+  };
+  const remove = (id: string) => setPdfResources(pdfResources.filter(p => p.id !== id));
+
+  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+    <FormCard>
+      <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Meal Recipes Vol. 1" style={inputStyle} /></Field>
+      <Field label="URL or Path"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="/pdfs/MEAL RECIPES 01.pdf or https://..." style={inputStyle} /></Field>
+      <Field label="Meta (shown below title)"><input value={draft.meta} onChange={e => setDraft(d => ({ ...d, meta: e.target.value }))} placeholder="PDF · Recipe collection" style={inputStyle} /></Field>
+      <div style={{ display: 'flex', gap: 8 }}><SaveBtn onClick={onSave} /><CancelBtn onClick={onCancel} /></div>
+    </FormCard>
+  );
+
+  return (
+    <div>
+      {pdfResources.map(p => editingId === p.id ? (
+        <Form key={p.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+      ) : (
+        <ItemRow key={p.id}>
+          <span style={{ fontSize: 18, flexShrink: 0 }}>📄</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 1 }}>{p.title}</p>
+            <p style={{ fontSize: 11, color: 'var(--text3)' }}>{p.meta}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}><EditBtn onClick={() => startEdit(p)} /><RemoveBtn onClick={() => remove(p.id)} /></div>
+        </ItemRow>
+      ))}
+      {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Resource" />}
+      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ContentManagerPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('supplements');
+  const [activeTab, setActiveTab] = useState<Tab>('webinars');
 
   return (
     <>
@@ -396,11 +682,16 @@ export default function ContentManagerPage() {
         </div>
 
         {/* Active editor */}
-        {activeTab === 'supplements' && <SupplementsEditor />}
-        {activeTab === 'mindset'     && <MindsetEditor />}
-        {activeTab === 'gymbag'      && <GymBagEditor />}
-        {activeTab === 'shopping'    && <ShoppingEditor />}
-        {activeTab === 'nonneg'      && <NonNegEditor />}
+        {activeTab === 'webinars'   && <WebinarsEditor />}
+        {activeTab === 'training'   && <TrainingVideosEditor />}
+        {activeTab === 'posingvids' && <PosingVideosEditor />}
+        {activeTab === 'posingtips' && <PosingTipsEditor />}
+        {activeTab === 'library'    && <LibraryEditor />}
+        {activeTab === 'supplements'&& <SupplementsEditor />}
+        {activeTab === 'mindset'    && <MindsetEditor />}
+        {activeTab === 'gymbag'     && <GymBagEditor />}
+        {activeTab === 'shopping'   && <ShoppingEditor />}
+        {activeTab === 'nonneg'     && <NonNegEditor />}
       </div>
     </>
   );
