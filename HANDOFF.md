@@ -15,66 +15,54 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-26, from the laptop — read this first)
-Context for whoever picks this up on the computer — here's what we just did and
-agreed in the laptop session. This session was about **workflow setup**, not app
-features:
-
-- Connected the project to GitHub properly and pushed everything that had only
-  been living on the laptop (~54 uncommitted changes).
-- Worked out that **chat history does NOT sync between machines or even between
-  terminals** — only what's committed to the repo travels. So we created two files
-  to carry context across machines:
-  - `CLAUDE.md` — the project brief; it **auto-loads at the start of every session**.
-  - `HANDOFF.md` (this file) — the **live "what we're working on now" state**. It is
-    meant to be **overwritten to match reality** each handoff, so finished work
-    never lingers as "Active".
-- Stopped tracking `.claude/settings.local.json` (per-machine, not shared).
-- Agreed the working rhythm: **`git pull` at the start → work in ONE place →
-  "update the handoff and push" at the end.** If a push is rejected, `git pull`
-  then push again. Never edit the same task on both machines at once.
-- Confirmed the app's real assets (logos, progress pics, the PDFs) live in
-  `public/` and already sync; only the loose outer folders (duplicate logos + the
-  Notion source archive) don't.
-
-So on the computer: read this note + `CLAUDE.md`, then carry on. When Dylan says
-"update the handoff and push," overwrite the Active section below to reflect what's
-actually in progress (and clear anything that's finished).
+## 📌 Latest handoff note (2026-05-26)
+Snapshot of the whole project state below. The build is well underway — auth and
+most coach/client features are wired to Supabase and pushed to GitHub. The one
+thing left mid-flight is the client top-bar (`Bulk · Week 8`), stopped on a design
+decision (see Active). Workflow reminder: `git pull` at start → work in ONE place →
+"update the handoff and push" at end. (Cross-machine setup is documented in `CLAUDE.md`.)
 
 ---
 
 ## 🔴 Active — in progress right now
-**Top bar: make the hardcoded phase/week real & per-client.**
-- Today every portal page shows a hardcoded `statusLabel="Bulk · Week 8"` —
-  it's copy-pasted into the `<Topbar>` of all 9 pages under `app/portal/`
-  (home, community, library, mindset, posing, recommendations, supplements,
-  training, webinars).
-- Goal: show each client's real goal + their actual week, centralised so it's
-  defined in ONE place, not duplicated 9×.
-- **Decision still to confirm with Dylan:** auto-count the week from each
-  client's join date (recommended — correct by default, with a Sam-set override),
-  vs. Sam manually sets the start/week per client.
-- **Intended machine:** computer.
+**Client top-bar `Bulk · Week 8` → make it real (stopped mid-decision).**
+- Currently hardcoded as `statusLabel="Bulk · Week 8"` across the 9 portal pages
+  under `app/portal/` (home, community, library, mindset, posing, recommendations,
+  supplements, training, webinars).
+- Plan: `goal = phase` (make editable in the coach roster); `week` = auto-count
+  from join date OR a Sam-set start date.
+- Blocker/need: a way for a **client to read their own record** (their goal/phase +
+  start date) so the top-bar can render real per-client values.
+- **Decision still open** (auto-from-join-date vs Sam-set start date). **Not started
+  in code.**
 
-## ✅ Recently done (most recent first — keep ~last 10)
-- 2026-05-26 (laptop) — Added `CLAUDE.md` (project brief, auto-loads) and this
-  `HANDOFF.md`; stopped tracking `.claude/settings.local.json`.
-- 2026-05-26 (laptop) — Role-gated login tabs (clients sign in under Client,
-  coaches under Coach; mismatch is rejected and signed out).
-- 2026-05-26 (laptop) — Sidebar logo/title now links to the role's home with a
-  green hover state.
-- 2026-05-26 (laptop) — Hardened logout (clears session client-side) and
-  `AuthProvider` (no longer breaks on a stale/revoked session).
-- 2026-05-26 (laptop) — Fixed invite acceptance always showing "expired"
-  (React StrictMode was double-running the callback effect and wiping the token).
-- 2026-05-26 (laptop) — Got the invite email working via Resend (Supabase custom
-  SMTP); confirmed the 403 cause = unverified sender domain.
+## ✅ Recently done
+- **Auth:** login, invite-accept + set password, sign out.
+- **Client roster → Supabase** (overview "recent clients" too).
+- **Content** (all 11 types) → Supabase; coach edits reach clients.
+- **Community events + RSVPs → Supabase** (coach + client).
+- **Messaging fully removed** (Sam uses WhatsApp).
+- **Client Health page real** — login tracking; scores from login + payment, with a
+  7-day grace for new clients.
+- **Overview churn alerts real.**
+- **Overview top stat cards real** — active clients, payments due, avg duration, MRR.
+- **Revenue page real** — payments ledger: collected, outstanding, YTD, MRR, monthly breakdown.
+- **Forecast page real** — MRR, projected annual, 3-month run-rate, per-client value.
+- **Client home fixed** — real name greeting + real RSVP status; removed hardcoded "dylan".
+- (Earlier this session, laptop) Cross-machine workflow setup: `CLAUDE.md`,
+  `HANDOFF.md`, role-gated login, sidebar logo link, invite StrictMode fix,
+  logout/AuthProvider hardening.
 
-## ⏭️ Next up / backlog
-- Verify a sender domain in Resend + update Supabase SMTP "from" so invites can
-  go to real client emails (currently sandbox-limited to the Resend owner).
-- Migrate remaining Notion content into the portal (source archive lives outside
-  the repo on the laptop: `old notion client portal data & images/`).
+## ⏭️ Still to do
+- **Analytics page (coach)** — still mock.
+- **Leaderboard (coach) + Referral page (client)** — need a referral-tracking system built.
+- **Onboarding page (client)** — not checked yet.
+- **Confirm the `last_login` SQL was actually run in Supabase.**
+
+## ⚠️ Watch out
+- **Referral feature still needs doing** (leaderboard + client referral page depend on it).
+- Invite emails: Resend sandbox sender only reaches the Resend account owner until a
+  domain is verified in Resend + the Supabase SMTP "from" is updated.
 
 ---
 
