@@ -1,5 +1,15 @@
 # SS Sustain Client Portal — Project Context
 
+## ⚠️ FIRST: read & maintain HANDOFF.md
+Work happens across two machines (laptop ↔ computer) and chat history does NOT
+sync between them — `HANDOFF.md` is how the "what we're working on now" context
+is carried over git.
+- **At the START of a session:** read `HANDOFF.md` to see the live working state.
+- **At the END of a session (before pushing):** UPDATE `HANDOFF.md` to match
+  reality — move finished work from "Active" into "Recently done", and set
+  "Active" to whatever is now in progress (or mark it idle). **Overwrite stale
+  entries; never leave a finished task marked Active.**
+
 ## What this is
 A custom client portal for SS Sustain, an online bodybuilding coaching
 business run by Sam Sutton. It replaces his current Notion client area.
