@@ -27,13 +27,6 @@ export default function CoachOverviewPage() {
     <>
       <Topbar title="Overview" statusLabel="Coach Dashboard" />
       <div className="px-8 py-7">
-        {/* TEMP SYNC TEST — remove after confirming git sync works across machines */}
-        <div
-          className="mb-6 px-5 py-4 rounded-[10px] text-[15px] font-bold text-center text-white"
-          style={{ background: 'var(--accent)', border: '2px dashed #fff' }}
-        >
-          🔁 SYNC TEST — if you can see this on the other machine, GitHub sync is working! ✅
-        </div>
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Good morning, <em className="italic" style={{ color: 'var(--accent-text)' }}>Coach.</em>
         </div>
