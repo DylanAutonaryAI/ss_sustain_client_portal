@@ -15,6 +15,34 @@
 
 ---
 
+## 📌 Latest handoff note (2026-05-26, from the laptop — read this first)
+Context for whoever picks this up on the computer — here's what we just did and
+agreed in the laptop session. This session was about **workflow setup**, not app
+features:
+
+- Connected the project to GitHub properly and pushed everything that had only
+  been living on the laptop (~54 uncommitted changes).
+- Worked out that **chat history does NOT sync between machines or even between
+  terminals** — only what's committed to the repo travels. So we created two files
+  to carry context across machines:
+  - `CLAUDE.md` — the project brief; it **auto-loads at the start of every session**.
+  - `HANDOFF.md` (this file) — the **live "what we're working on now" state**. It is
+    meant to be **overwritten to match reality** each handoff, so finished work
+    never lingers as "Active".
+- Stopped tracking `.claude/settings.local.json` (per-machine, not shared).
+- Agreed the working rhythm: **`git pull` at the start → work in ONE place →
+  "update the handoff and push" at the end.** If a push is rejected, `git pull`
+  then push again. Never edit the same task on both machines at once.
+- Confirmed the app's real assets (logos, progress pics, the PDFs) live in
+  `public/` and already sync; only the loose outer folders (duplicate logos + the
+  Notion source archive) don't.
+
+So on the computer: read this note + `CLAUDE.md`, then carry on. When Dylan says
+"update the handoff and push," overwrite the Active section below to reflect what's
+actually in progress (and clear anything that's finished).
+
+---
+
 ## 🔴 Active — in progress right now
 **Top bar: make the hardcoded phase/week real & per-client.**
 - Today every portal page shows a hardcoded `statusLabel="Bulk · Week 8"` —
