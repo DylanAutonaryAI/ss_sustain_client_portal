@@ -3,6 +3,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ContentProvider } from "@/context/ContentContext";
+import { CommunityProvider } from "@/context/CommunityContext";
+import { ClientProvider } from "@/context/ClientContext";
 
 export const metadata: Metadata = {
   title: "SS Sustain — Client Portal",
@@ -28,7 +30,11 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <ContentProvider>
-              {children}
+              <CommunityProvider>
+                <ClientProvider>
+                  {children}
+                </ClientProvider>
+              </CommunityProvider>
             </ContentProvider>
           </AuthProvider>
         </ThemeProvider>

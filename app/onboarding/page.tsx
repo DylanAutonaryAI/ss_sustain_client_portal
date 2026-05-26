@@ -103,7 +103,12 @@ export default function OnboardingPage() {
               <div
                 className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
                 style={{ background: 'var(--accent)' }}
-                onClick={() => !isComplete && completeStep()}
+                onClick={() => {
+                  if (!isComplete) {
+                    if (step.url) window.open(step.url, '_blank', 'noopener,noreferrer');
+                    completeStep();
+                  }
+                }}
               >
                 <div
                   className="ml-1"

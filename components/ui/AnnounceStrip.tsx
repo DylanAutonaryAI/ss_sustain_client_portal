@@ -1,6 +1,41 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import type { Announcement } from '@/lib/types';
 
+const STORAGE_KEY = 'ss-dismissed-announcements';
+
+function getDismissed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissed(ids: Set<string>) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
+
 export default function AnnounceStrip({ announcement }: { announcement: Announcement }) {
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    setDismissed(getDismissed().has(announcement.id));
+  }, [announcement.id]);
+
+  function dismiss() {
+    const ids = getDismissed();
+    ids.add(announcement.id);
+    saveDismissed(ids);
+    setDismissed(true);
+  }
+
+  if (dismissed) return null;
+
   return (
     <div
       className="flex items-start gap-3.5 px-5 py-4 mb-2.5 rounded-r-[10px]"
@@ -20,9 +55,27 @@ export default function AnnounceStrip({ announcement }: { announcement: Announce
           {announcement.body}
         </p>
       </div>
-      <span className="text-[11px] flex-shrink-0 whitespace-nowrap ml-auto" style={{ color: 'var(--text3)' }}>
-        {announcement.time}
-      </span>
+      <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
+        <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text3)' }}>
+          {announcement.time}
+        </span>
+        <button
+          onClick={dismiss}
+          title="Dismiss"
+          className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[11px] leading-none transition-all duration-150"
+          style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text3)', cursor: 'pointer', lineHeight: 1 }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'var(--border2)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg2)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)';
+          }}
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }

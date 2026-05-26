@@ -1,46 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
-import { PayTag } from '@/components/ui/Pill';
-import { revenueRows, revenueStats } from '@/lib/mock-data/revenue';
-import type { RevenueRow } from '@/lib/types';
+import { useClientRoster } from '@/lib/clients';
+import { usePayments, computeMrr, formatGBP as GBP } from '@/lib/payments';
+import type { PaymentStatus } from '@/lib/types';
+
+const inputStyle: React.CSSProperties = {
+  background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 8,
+  padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%',
+};
 
 export default function RevenuePage() {
-  const [rows, setRows] = useState<RevenueRow[]>(revenueRows);
-  const [client, setClient]   = useState('Dylan Y.');
-  const [amount, setAmount]   = useState('');
-  const [status, setStatus]   = useState<'Paid' | 'Due' | 'Overdue'>('Paid');
-  const [added, setAdded]     = useState(false);
+  const { clients } = useClientRoster();
+  const { payments, loading, refetch } = usePayments();
 
-  const handleAdd = () => {
-    const now = new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-    setRows((prev) => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        month: `${now} — ${client}`,
-        clients: 1,
-        mrr: `£${amount || '147'}`,
-        status: status === 'Paid' ? 'Complete' : 'In progress',
-      },
-    ]);
+  const [clientId, setClientId] = useState('');
+  const [amount, setAmount]     = useState('');
+  const [status, setStatus]     = useState<PaymentStatus>('Paid');
+  const [added, setAdded]       = useState(false);
+  const [saving, setSaving]     = useState(false);
+
+  useEffect(() => {
+    if (!clientId && clients.length > 0) setClientId(clients[0].id);
+  }, [clients, clientId]);
+
+  async function handleAdd() {
+    const amt = Number(amount);
+    if (isNaN(amt) || amt <= 0 || !clientId) return;
+    const c = clients.find(x => x.id === clientId);
+    setSaving(true);
+    await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_name: c?.name ?? 'Client', amount: amt, status }),
+    }).catch(() => {});
     setAmount('');
+    setSaving(false);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
-  };
+    refetch();
+  }
 
-  const inputStyle = {
-    background: 'var(--bg2)',
-    border: '1px solid var(--border2)',
-    borderRadius: '8px',
-    padding: '9px 12px',
-    color: 'var(--text)',
-    fontSize: '13px',
-    outline: 'none',
-    width: '100%',
-  };
+  // ── computed stats ──────────────────────────────────────────────
+  const now       = new Date();
+  const thisMonth = now.toISOString().slice(0, 7); // YYYY-MM
+  const thisYear  = String(now.getFullYear());
+
+  const collected = payments
+    .filter(p => p.status === 'Paid' && p.paid_at?.slice(0, 7) === thisMonth)
+    .reduce((s, p) => s + p.amount, 0);
+
+  const ytd = payments
+    .filter(p => p.status === 'Paid' && p.paid_at?.slice(0, 4) === thisYear)
+    .reduce((s, p) => s + p.amount, 0);
+
+  const outstandingList = payments.filter(p => p.status === 'Due' || p.status === 'Overdue');
+  const outstanding     = outstandingList.reduce((s, p) => s + p.amount, 0);
+
+  const mrr = computeMrr(payments, clients);
+
+  // Monthly breakdown of collected revenue, most recent first
+  const byMonth: Record<string, { total: number; count: number }> = {};
+  for (const p of payments) {
+    if (p.status !== 'Paid' || !p.paid_at) continue;
+    const key = p.paid_at.slice(0, 7);
+    (byMonth[key] ??= { total: 0, count: 0 });
+    byMonth[key].total += p.amount;
+    byMonth[key].count += 1;
+  }
+  const months = Object.entries(byMonth)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, v]) => {
+      const [y, m] = key.split('-');
+      const label = new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+      return { key, label, total: v.total, count: v.count, isCurrent: key === thisMonth };
+    });
 
   return (
     <>
@@ -54,10 +90,10 @@ export default function RevenuePage() {
         </p>
 
         <div className="grid grid-cols-4 gap-3 mb-6">
-          <StatCard label="MRR"               value={revenueStats.mrr}        changeType="up"      change={`↑ ${revenueStats.mrrChange}`}   valueColor="var(--accent-text)" />
-          <StatCard label="Collected this month" value={revenueStats.collected} changeType="neutral" change={`${revenueStats.outstandingCount} outstanding`} valueColor="var(--accent-text)" />
-          <StatCard label="Outstanding"       value={revenueStats.outstanding} changeType="down"    change="Chase before billing"             valueColor="var(--red)" />
-          <StatCard label="YTD revenue"       value={revenueStats.ytd}         changeType="up"      change="On track for £90k"                valueColor="var(--accent-text)" />
+          <StatCard label="MRR"                  value={GBP(mrr)}         changeType="neutral" change="Active clients × current rate"          valueColor="var(--accent-text)" />
+          <StatCard label="Collected this month" value={GBP(collected)}   changeType="neutral" change={`${outstandingList.length} outstanding`} valueColor="var(--accent-text)" />
+          <StatCard label="Outstanding"          value={GBP(outstanding)} changeType={outstanding > 0 ? 'down' : 'neutral'} change={outstanding > 0 ? 'Chase before billing' : 'Nothing outstanding'} valueColor={outstanding > 0 ? 'var(--red)' : 'var(--accent-text)'} />
+          <StatCard label="YTD revenue"          value={GBP(ytd)}         changeType="neutral" change={`${thisYear} to date`}                  valueColor="var(--accent-text)" />
         </div>
 
         {/* Add payment */}
@@ -71,10 +107,9 @@ export default function RevenuePage() {
           <div className="grid gap-2.5 items-end" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.8px] mb-1.5" style={{ color: 'var(--text3)' }}>Client</label>
-              <select value={client} onChange={(e) => setClient(e.target.value)} style={inputStyle}>
-                {['Dylan Y.','James M.','Connor R.','Tom H.','Aaron K.'].map((n) => (
-                  <option key={n}>{n}</option>
-                ))}
+              <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={inputStyle}>
+                {clients.length === 0 && <option value="">No clients yet</option>}
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
@@ -91,18 +126,19 @@ export default function RevenuePage() {
             </div>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.8px] mb-1.5" style={{ color: 'var(--text3)' }}>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value as 'Paid' | 'Due' | 'Overdue')} style={inputStyle}>
+              <select value={status} onChange={(e) => setStatus(e.target.value as PaymentStatus)} style={inputStyle}>
                 <option>Paid</option><option>Due</option><option>Overdue</option>
               </select>
             </div>
             <button
               onClick={handleAdd}
-              className="px-[18px] py-[9px] rounded-[8px] text-[13px] font-semibold text-white whitespace-nowrap transition-all duration-150"
-              style={{ background: added ? '#0d8f3e' : 'var(--accent)' }}
-              onMouseEnter={(e) => { if (!added) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
+              disabled={saving || !clientId || !amount}
+              className="px-[18px] py-[9px] rounded-[8px] text-[13px] font-semibold text-white whitespace-nowrap transition-all duration-150 disabled:opacity-60"
+              style={{ background: added ? '#0d8f3e' : 'var(--accent)', border: 'none', cursor: saving || !clientId || !amount ? 'default' : 'pointer' }}
+              onMouseEnter={(e) => { if (!added && !saving) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ''; }}
             >
-              {added ? 'Added ✓' : 'Add'}
+              {added ? 'Added ✓' : saving ? 'Adding…' : 'Add'}
             </button>
           </div>
         </div>
@@ -117,28 +153,45 @@ export default function RevenuePage() {
         >
           <div
             className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
-            style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
+            style={{ gridTemplateColumns: '2fr 1fr 1fr', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
           >
-            <div>Month</div><div>Clients</div><div>MRR</div><div>Status</div>
+            <div>Month</div><div>Payments</div><div>Collected</div>
           </div>
-          {rows.map((r, i) => (
+          {months.map((r, i) => (
             <div
-              key={r.id}
+              key={r.key}
               className="grid items-center px-5 py-3 text-[13px] transition-colors duration-100"
               style={{
-                gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : 'none',
+                gridTemplateColumns: '2fr 1fr 1fr',
+                borderBottom: i < months.length - 1 ? '1px solid var(--border)' : 'none',
                 color: 'var(--text2)',
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg2)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = ''; }}
             >
-              <div style={{ color: 'var(--text)' }}>{r.month}</div>
-              <div>{r.clients}</div>
-              <div style={{ color: 'var(--accent-text)', fontWeight: 500 }}>{r.mrr}</div>
-              <div><PayTag status={r.status === 'Complete' ? 'Paid' : 'Due'} /></div>
+              <div className="flex items-center gap-2" style={{ color: 'var(--text)' }}>
+                {r.label}
+                {r.isCurrent && (
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)' }}
+                  >
+                    This month
+                  </span>
+                )}
+              </div>
+              <div>{r.count}</div>
+              <div style={{ color: 'var(--accent-text)', fontWeight: 500 }}>{GBP(r.total)}</div>
             </div>
           ))}
+          {loading && (
+            <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--text3)' }}>Loading payments…</div>
+          )}
+          {!loading && months.length === 0 && (
+            <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--text3)' }}>
+              No payments logged yet. Add your first one above.
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -1,18 +1,25 @@
 'use client';
 
 import { useAuth } from '@/context/AuthContext';
+import { useCommunity } from '@/context/CommunityContext';
 import Sidebar, { NavSection } from './Sidebar';
 import { Icons } from './icons';
 
 export default function ClientSidebar() {
   const { user } = useAuth();
+  const { pendingCount } = useCommunity();
 
   const sections: NavSection[] = [
     {
       label: 'Overview',
       items: [
-        { label: 'Home',          href: '/portal/home',            icon: Icons.grid },
-        { label: 'Coach Messages',href: '/portal/messages',        icon: Icons.message, badge: 2 },
+        { label: 'Home', href: '/portal/home', icon: Icons.grid },
+      ],
+    },
+    {
+      label: 'Community',
+      items: [
+        { label: 'Events & Calls', href: '/portal/community', icon: Icons.calendar, badge: pendingCount > 0 ? pendingCount : undefined },
       ],
     },
     {
@@ -36,6 +43,7 @@ export default function ClientSidebar() {
       label: 'Account',
       items: [
         { label: 'Refer a Friend', href: '/portal/referral', icon: Icons.users },
+        { label: 'Settings',       href: '/portal/settings', icon: Icons.gear  },
       ],
     },
   ];
@@ -43,8 +51,9 @@ export default function ClientSidebar() {
   return (
     <Sidebar
       sections={sections}
-      userName={user?.name ?? 'Client'}
+      userName={user?.nickname || user?.name || 'Client'}
       userInitials={user?.initials ?? '??'}
+      userAvatar={user?.avatarUrl}
       userRole={user?.phase ?? 'Active client'}
       isCoach={false}
     />

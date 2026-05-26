@@ -8,16 +8,16 @@ import type { Supplement, MindsetTip, GymBagItem, ShoppingItem, ShoppingCategory
 type Tab = 'supplements' | 'mindset' | 'webinars' | 'training' | 'posingvids' | 'posingtips' | 'library' | 'gymbag' | 'shopping' | 'nonneg';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'webinars',   label: 'Webinars' },
-  { id: 'training',   label: 'Training Vids' },
-  { id: 'posingvids', label: 'Posing Vids' },
-  { id: 'posingtips', label: 'Posing Tips' },
-  { id: 'library',    label: 'Library' },
-  { id: 'supplements',label: 'Supplements' },
-  { id: 'mindset',    label: 'Mindset' },
-  { id: 'gymbag',     label: 'Gym Bag' },
-  { id: 'shopping',   label: 'Shopping' },
-  { id: 'nonneg',     label: 'Non-Neg' },
+  { id: 'webinars',    label: 'Webinars' },
+  { id: 'training',    label: 'Training Vids' },
+  { id: 'posingvids',  label: 'Posing Vids' },
+  { id: 'posingtips',  label: 'Posing Tips' },
+  { id: 'library',     label: 'Library' },
+  { id: 'supplements', label: 'Supplements' },
+  { id: 'mindset',     label: 'Mindset' },
+  { id: 'gymbag',      label: 'Gym Bag' },
+  { id: 'shopping',    label: 'Shopping' },
+  { id: 'nonneg',      label: 'Non-Neg' },
 ];
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
@@ -92,6 +92,15 @@ function AddNewBtn({ onClick, label = '+ Add New' }: { onClick: () => void; labe
   );
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function extractYouTubeId(input: string): string {
+  const m1 = input.match(/shorts\/([a-zA-Z0-9_-]+)/);   if (m1) return m1[1];
+  const m2 = input.match(/[?&]v=([a-zA-Z0-9_-]+)/);     if (m2) return m2[1];
+  const m3 = input.match(/youtu\.be\/([a-zA-Z0-9_-]+)/); if (m3) return m3[1];
+  return input.trim();
+}
+
 // ─── Supplements Editor ───────────────────────────────────────────────────────
 
 function SupplementsEditor() {
@@ -102,7 +111,7 @@ function SupplementsEditor() {
   const [draft, setDraft] = useState(blank());
 
   const startEdit = (s: Supplement) => { setAddOpen(false); setEditingId(s.id); setDraft({ icon: s.icon, name: s.name, description: s.description, essential: s.essential, url: s.url ?? '' }); };
-  const cancelEdit = () => { setEditingId(null); };
+  const cancelEdit = () => setEditingId(null);
   const saveEdit = () => {
     if (!draft.name.trim()) return;
     setSupplements(supplements.map(s => s.id === editingId ? { ...s, ...draft } : s));
@@ -116,7 +125,7 @@ function SupplementsEditor() {
   };
   const remove = (id: string) => setSupplements(supplements.filter(s => s.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', gap: 10, marginBottom: 10 }}>
         <Field label="Icon"><input value={draft.icon} onChange={e => setDraft(d => ({ ...d, icon: e.target.value }))} placeholder="💊" style={{ ...inputStyle, textAlign: 'center', fontSize: 18 }} /></Field>
@@ -137,7 +146,7 @@ function SupplementsEditor() {
   return (
     <div>
       {supplements.map(s => editingId === s.id ? (
-        <Form key={s.id} onSave={saveEdit} onCancel={cancelEdit} />
+        <div key={s.id}>{formJsx(saveEdit, cancelEdit)}</div>
       ) : (
         <ItemRow key={s.id}>
           <span style={{ fontSize: 20, width: 32, textAlign: 'center', flexShrink: 0 }}>{s.icon}</span>
@@ -152,7 +161,7 @@ function SupplementsEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={startAdd} label="+ Add Supplement" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -179,7 +188,7 @@ function MindsetEditor() {
   };
   const remove = (id: string) => setMindsetTips(mindsetTips.filter(t => t.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Tip title" style={inputStyle} /></Field>
       <Field label="Body"><textarea value={draft.body} onChange={e => setDraft(d => ({ ...d, body: e.target.value }))} placeholder="Tip description..." rows={3} style={{ ...inputStyle, resize: 'vertical' }} /></Field>
@@ -190,7 +199,7 @@ function MindsetEditor() {
   return (
     <div>
       {mindsetTips.map((t, i) => editingId === t.id ? (
-        <Form key={t.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={t.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={t.id}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-dim)', flexShrink: 0, minWidth: 28 }}>
@@ -204,7 +213,7 @@ function MindsetEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Tip" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -231,7 +240,7 @@ function GymBagEditor() {
   };
   const remove = (id: string) => setGymBag(gymBag.filter(g => g.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Item Name"><input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} placeholder="e.g. Lifting Belt" style={inputStyle} /></Field>
       <Field label="Description"><textarea value={draft.desc} onChange={e => setDraft(d => ({ ...d, desc: e.target.value }))} placeholder="What it's used for..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} /></Field>
@@ -246,7 +255,7 @@ function GymBagEditor() {
   return (
     <div>
       {gymBag.map(g => editingId === g.id ? (
-        <Form key={g.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={g.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={g.id}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -258,7 +267,7 @@ function GymBagEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Item" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -337,7 +346,7 @@ function NonNegEditor() {
   };
   const remove = (id: string) => setNonNeg(nonNeg.filter(n => n.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Label"><input value={draft.label} onChange={e => setDraft(d => ({ ...d, label: e.target.value }))} placeholder="e.g. Steps" style={inputStyle} /></Field>
       <Field label="Description"><input value={draft.desc} onChange={e => setDraft(d => ({ ...d, desc: e.target.value }))} placeholder="e.g. Meeting your daily step target" style={inputStyle} /></Field>
@@ -348,7 +357,7 @@ function NonNegEditor() {
   return (
     <div>
       {nonNeg.map((n, i) => editingId === n.id ? (
-        <Form key={n.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={n.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={n.id}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-text)', minWidth: 20, flexShrink: 0 }}>{i + 1}</span>
@@ -360,18 +369,9 @@ function NonNegEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Item" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function extractYouTubeId(input: string): string {
-  const m1 = input.match(/shorts\/([a-zA-Z0-9_-]+)/);  if (m1) return m1[1];
-  const m2 = input.match(/[?&]v=([a-zA-Z0-9_-]+)/);    if (m2) return m2[1];
-  const m3 = input.match(/youtu\.be\/([a-zA-Z0-9_-]+)/); if (m3) return m3[1];
-  return input.trim();
 }
 
 // ─── Webinars Editor ──────────────────────────────────────────────────────────
@@ -398,7 +398,7 @@ function WebinarsEditor() {
   };
   const remove = (id: string) => setWebinars(webinars.filter(w => w.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Fat Loss Fundamentals" style={inputStyle} /></Field>
       <Field label="Video URL (Loom, YouTube, etc.)"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="https://www.loom.com/share/..." style={inputStyle} /></Field>
@@ -417,7 +417,7 @@ function WebinarsEditor() {
   return (
     <div>
       {webinars.map(w => editingId === w.id ? (
-        <Form key={w.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={w.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={w.id}>
           <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)', flexShrink: 0 }}>{w.tag ?? 'Video'}</span>
@@ -429,7 +429,7 @@ function WebinarsEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Webinar" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -456,7 +456,7 @@ function TrainingVideosEditor() {
   };
   const remove = (id: string) => setTrainingVideos(trainingVideos.filter(v => v.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Incline DB Press — Full Form Guide" style={inputStyle} /></Field>
       <Field label="Video URL (YouTube, Loom, etc.)"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="https://..." style={inputStyle} /></Field>
@@ -474,7 +474,7 @@ function TrainingVideosEditor() {
         Reference / demo videos that appear at the top of the Training Clips page for clients to watch.
       </p>
       {trainingVideos.map(v => editingId === v.id ? (
-        <Form key={v.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={v.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={v.id}>
           {v.tag && <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)', flexShrink: 0 }}>{v.tag}</span>}
@@ -487,7 +487,7 @@ function TrainingVideosEditor() {
       ))}
       {trainingVideos.length === 0 && !addOpen && <p style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 0' }}>No reference videos added yet.</p>}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Training Video" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -514,7 +514,7 @@ function PosingVideosEditor() {
   };
   const remove = (id: string) => setPosingVideos(posingVideos.filter(v => v.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="YouTube URL or Video ID"><input value={draft.youtubeUrl} onChange={e => setDraft(d => ({ ...d, youtubeUrl: e.target.value }))} placeholder="https://www.youtube.com/shorts/..." style={inputStyle} /></Field>
       <Field label="Label (displayed below video)"><input value={draft.label} onChange={e => setDraft(d => ({ ...d, label: e.target.value }))} placeholder="e.g. Front Double Bicep" style={inputStyle} /></Field>
@@ -530,7 +530,7 @@ function PosingVideosEditor() {
   return (
     <div>
       {posingVideos.map(v => editingId === v.id ? (
-        <Form key={v.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={v.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={v.id}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -541,7 +541,7 @@ function PosingVideosEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Posing Video" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -568,7 +568,7 @@ function PosingTipsEditor() {
   };
   const remove = (id: string) => setPosingTips(posingTips.filter(t => t.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Key / Title"><input value={draft.key} onChange={e => setDraft(d => ({ ...d, key: e.target.value }))} placeholder="e.g. Vacuum" style={inputStyle} /></Field>
       <Field label="Tip Body"><textarea value={draft.body} onChange={e => setDraft(d => ({ ...d, body: e.target.value }))} placeholder="Describe the coaching tip..." rows={2} style={{ ...inputStyle, resize: 'vertical' }} /></Field>
@@ -579,7 +579,7 @@ function PosingTipsEditor() {
   return (
     <div>
       {posingTips.map(t => editingId === t.id ? (
-        <Form key={t.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={t.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={t.id}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -590,7 +590,7 @@ function PosingTipsEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Tip" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -617,7 +617,7 @@ function LibraryEditor() {
   };
   const remove = (id: string) => setPdfResources(pdfResources.filter(p => p.id !== id));
 
-  const Form = ({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) => (
+  const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Meal Recipes Vol. 1" style={inputStyle} /></Field>
       <Field label="URL or Path"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="/pdfs/MEAL RECIPES 01.pdf or https://..." style={inputStyle} /></Field>
@@ -629,7 +629,7 @@ function LibraryEditor() {
   return (
     <div>
       {pdfResources.map(p => editingId === p.id ? (
-        <Form key={p.id} onSave={saveEdit} onCancel={() => setEditingId(null)} />
+        <div key={p.id}>{formJsx(saveEdit, () => setEditingId(null))}</div>
       ) : (
         <ItemRow key={p.id}>
           <span style={{ fontSize: 18, flexShrink: 0 }}>📄</span>
@@ -641,7 +641,7 @@ function LibraryEditor() {
         </ItemRow>
       ))}
       {!addOpen && <AddNewBtn onClick={() => { setEditingId(null); setAddOpen(true); setDraft(blank()); }} label="+ Add Resource" />}
-      {addOpen && <Form onSave={saveAdd} onCancel={() => setAddOpen(false)} />}
+      {addOpen && formJsx(saveAdd, () => setAddOpen(false))}
     </div>
   );
 }
@@ -654,7 +654,7 @@ export default function ContentManagerPage() {
   return (
     <>
       <Topbar title="Content Manager" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7 max-w-[760px]">
+      <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Content <em className="italic" style={{ color: 'var(--accent-text)' }}>Manager</em>
         </div>
@@ -682,16 +682,16 @@ export default function ContentManagerPage() {
         </div>
 
         {/* Active editor */}
-        {activeTab === 'webinars'   && <WebinarsEditor />}
-        {activeTab === 'training'   && <TrainingVideosEditor />}
-        {activeTab === 'posingvids' && <PosingVideosEditor />}
-        {activeTab === 'posingtips' && <PosingTipsEditor />}
-        {activeTab === 'library'    && <LibraryEditor />}
-        {activeTab === 'supplements'&& <SupplementsEditor />}
-        {activeTab === 'mindset'    && <MindsetEditor />}
-        {activeTab === 'gymbag'     && <GymBagEditor />}
-        {activeTab === 'shopping'   && <ShoppingEditor />}
-        {activeTab === 'nonneg'     && <NonNegEditor />}
+        {activeTab === 'webinars'    && <WebinarsEditor />}
+        {activeTab === 'training'    && <TrainingVideosEditor />}
+        {activeTab === 'posingvids'  && <PosingVideosEditor />}
+        {activeTab === 'posingtips'  && <PosingTipsEditor />}
+        {activeTab === 'library'     && <LibraryEditor />}
+        {activeTab === 'supplements' && <SupplementsEditor />}
+        {activeTab === 'mindset'     && <MindsetEditor />}
+        {activeTab === 'gymbag'      && <GymBagEditor />}
+        {activeTab === 'shopping'    && <ShoppingEditor />}
+        {activeTab === 'nonneg'      && <NonNegEditor />}
       </div>
     </>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import ThemeToggle from './ThemeToggle';
@@ -25,6 +26,7 @@ interface SidebarProps {
   userInitials: string;
   userRole: string;
   isCoach?: boolean;
+  userAvatar?: string;
 }
 
 export default function Sidebar({
@@ -33,9 +35,11 @@ export default function Sidebar({
   userInitials,
   userRole,
   isCoach = false,
+  userAvatar,
 }: SidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const homeHref = isCoach ? '/coach/overview' : '/portal/home';
 
   return (
     <aside
@@ -47,12 +51,16 @@ export default function Sidebar({
     >
       {/* Brand + user */}
       <div className="px-4 pt-5 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-2.5 mb-3.5">
+        <Link
+          href={homeHref}
+          aria-label="Go to home"
+          className="group flex items-center gap-2.5 mb-3.5 -mx-2 -mt-1.5 px-2 py-1.5 rounded-[10px] transition-all duration-150 hover:bg-[var(--accent-mid)] hover:shadow-lg"
+        >
           <SsLogo size={48} />
-          <span className="font-serif text-[16px] tracking-[-0.3px]" style={{ color: 'var(--text)' }}>
+          <span className="font-serif text-[16px] tracking-[-0.3px] text-[color:var(--text)] transition-colors duration-150 group-hover:text-[color:var(--accent-text)]">
             SS Sustain
           </span>
-        </div>
+        </Link>
 
         <div
           className="flex items-center gap-2.5 px-3 py-2.5 rounded-[9px]"
@@ -62,14 +70,26 @@ export default function Sidebar({
           }}
         >
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0 overflow-hidden"
             style={{
-              background: isCoach
-                ? 'linear-gradient(135deg, #16c45a, #0d8f3e)'
-                : 'var(--accent)',
+              background: userAvatar
+                ? 'transparent'
+                : isCoach
+                  ? 'linear-gradient(135deg, #16c45a, #0d8f3e)'
+                  : 'var(--accent)',
             }}
           >
-            {userInitials}
+            {userAvatar ? (
+              <Image
+                src={userAvatar}
+                alt={userName}
+                width={28}
+                height={28}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              userInitials
+            )}
           </div>
           <div>
             <div className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>

@@ -23,7 +23,7 @@ export default function RecommendationsPage() {
   return (
     <>
       <Topbar title="Recommendations" statusLabel="Bulk · Week 8" />
-      <div className="px-8 py-7 max-w-[820px]">
+      <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Coach <em className="italic" style={{ color: 'var(--accent-text)' }}>Recommendations</em>
         </div>

@@ -15,6 +15,7 @@ export const clients: Client[] = [
     healthScore: 92,
     referrals: 4,
     notes: "One of the most consistent clients. Also building his own AI agency — very driven. Responds well to data and numbers. Hip flexor tightness from desk work.",
+    nextPaymentDate: '2026-06-01',
   },
   {
     id: 'jm',
@@ -30,6 +31,7 @@ export const clients: Client[] = [
     healthScore: 88,
     referrals: 2,
     notes: "Lower back niggle mentioned in week 2 — programming around it. Very motivated, responds well to direct feedback. Works in finance, high stress. Needs to be reminded to sleep.",
+    nextPaymentDate: '2026-05-27',
   },
   {
     id: 'cr',
@@ -45,6 +47,7 @@ export const clients: Client[] = [
     healthScore: 81,
     referrals: 3,
     notes: "Very consistent. Had a bad month in January — personal issues. Loves heavy compounds. Don't switch to isolation-heavy programmes, he finds them demotivating.",
+    nextPaymentDate: '2026-06-05',
   },
   {
     id: 'th',
@@ -60,6 +63,7 @@ export const clients: Client[] = [
     healthScore: 24,
     referrals: 1,
     notes: "Going quiet — hasn't logged in for 2 weeks. May be struggling with consistency. Needs a check-in message. Payment due Friday.",
+    nextPaymentDate: '2026-05-15',
   },
   {
     id: 'ak',
@@ -75,5 +79,6 @@ export const clients: Client[] = [
     healthScore: 41,
     referrals: 0,
     notes: "Paused due to holiday. Should be back May 1st. Knee issue — avoid anything high impact. Had a good first month before pausing.",
+    nextPaymentDate: '2026-06-10',
   },
 ];

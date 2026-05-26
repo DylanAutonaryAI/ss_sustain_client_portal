@@ -50,15 +50,6 @@ export interface PdfResource {
   url?: string;
 }
 
-export interface CoachMessage {
-  id: string;
-  fromInitials: string;
-  from: string;
-  time: string;
-  body: string;
-  unread: boolean;
-}
-
 export type PaymentStatus = 'Paid' | 'Due' | 'Overdue';
 export type ClientStatus = 'Active' | 'Paused';
 
@@ -76,6 +67,11 @@ export interface Client {
   healthScore: number;
   referrals: number;
   notes: string;
+  nextPaymentDate?: string; // YYYY-MM-DD — drives auto Paid/Due/Overdue
+  // Synced from the client's own profile (profiles table) when they have a login
+  avatarUrl?: string;
+  nickname?: string;
+  birthday?: string; // YYYY-MM-DD
 }
 
 export interface RevenueRow {
@@ -84,6 +80,15 @@ export interface RevenueRow {
   clients: number;
   mrr: string;
   status: 'In progress' | 'Complete';
+}
+
+export interface Payment {
+  id: string;
+  client_id: string | null;
+  client_name: string;
+  amount: number;
+  status: PaymentStatus;
+  paid_at: string; // YYYY-MM-DD
 }
 
 export interface MindsetTip {
@@ -136,4 +141,26 @@ export interface OnboardingStep {
   duration?: string;
   actionLabel?: string;
   url?: string;
+}
+
+export type EventType = 'live-call' | 'q-and-a' | 'workshop' | 'challenge' | 'social';
+
+export interface EventRSVP {
+  clientId: string;
+  clientName: string;
+  clientInitials: string;
+  status: 'attending' | 'declined' | 'pending';
+  reason?: string;
+}
+
+export interface CommunityEvent {
+  id: string;
+  title: string;
+  description: string;
+  type: EventType;
+  date: string;      // YYYY-MM-DD
+  time: string;      // e.g. '7:00 PM BST'
+  duration: string;  // e.g. '60 min'
+  link?: string;
+  rsvps: EventRSVP[];
 }

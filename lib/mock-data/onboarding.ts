@@ -31,6 +31,22 @@ export const onboardingSteps: OnboardingStep[] = [
   },
   {
     id: '5',
+    type: 'video',
+    title: 'Get set up on 1fit',
+    duration: '3 min',
+    description: "1fit is the app where everything happens — your weekly check-ins go in here, and this is where Sam sends your video and written feedback each week. Watch this to get the app downloaded and ready before your first check-in.",
+    url: 'https://www.loom.com/share/99d9072bf1dd438da8ab7423002d6782',
+  },
+  {
+    id: '5b',
+    type: 'video',
+    title: 'Track your nutrition in MyFitnessPal',
+    duration: '3 min',
+    description: "MyFitnessPal is how you log your food each day. Sam will review your intake as part of your weekly check-in. Watch this to get it set up correctly from the start.",
+    url: 'https://www.loom.com/share/035a1d6ce47c4e4e86faa5691711992e',
+  },
+  {
+    id: '6',
     type: 'doc',
     title: 'Complete your intake form',
     description: "Make a copy of Sam's Google doc intake form, fill it in fully, and send it back. This lets Sam personalise your programme from day one.",

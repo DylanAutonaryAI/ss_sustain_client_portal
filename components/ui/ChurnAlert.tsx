@@ -25,7 +25,7 @@ export default function ChurnAlert({ icon, title, body }: ChurnAlertProps) {
         <p className="text-[12px] leading-[1.6]" style={{ color: 'var(--text2)' }}>{body}</p>
       </div>
       <button
-        onClick={() => router.push('/coach/messages')}
+        onClick={() => router.push('/coach/health')}
         className="flex-shrink-0 ml-auto px-3.5 py-1.5 rounded-[7px] text-[12px] font-medium whitespace-nowrap transition-all duration-150"
         style={{
           border: '1px solid rgba(240,79,79,0.3)',
@@ -35,7 +35,7 @@ export default function ChurnAlert({ icon, title, body }: ChurnAlertProps) {
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(240,79,79,0.08)'; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
       >
-        Message now
+        Review →
       </button>
     </div>
   );

@@ -1,11 +1,43 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
-import { clients } from '@/lib/mock-data/clients';
+
+interface Row {
+  id: string;
+  name: string;
+  since: string;
+  status: string;
+  referrals: number;
+  avatarUrl: string | null;
+  nickname: string | null;
+}
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('') || '?';
+}
 
 const rankColors: Record<number, string> = { 1: '#f59e0b', 2: '#94a3b8', 3: '#c97c3a' };
 
 export default function LeaderboardPage() {
-  const ranked = [...clients].sort((a, b) => b.referrals - a.referrals);
+  const [ranked, setRanked]   = useState<Row[]>([]);
+  const [total, setTotal]     = useState(0);
+  const [referrers, setRefs]  = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/referral/leaderboard', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        if (Array.isArray(d.ranked)) { setRanked(d.ranked); setTotal(d.totalReferrals); setRefs(d.referrers); }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const top = ranked.find(r => r.referrals > 0);
 
   return (
     <>
@@ -15,56 +47,66 @@ export default function LeaderboardPage() {
           Referral <em className="italic" style={{ color: 'var(--accent-text)' }}>Leaderboard</em>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
-          Who&apos;s driving your word-of-mouth growth. Reward the top referrers, run competitions, track your best ambassadors.
+          Who&apos;s driving your word-of-mouth growth. Each client has a referral link; signups through it are credited here.
         </p>
 
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <StatCard label="Total referrals this month"    value="11"    valueColor="var(--accent-text)" changeType="up"      change="↑ +4 vs last month" />
-          <StatCard label="Converted to paying clients"   value="7"     valueColor="var(--accent-text)" changeType="neutral" change="63% conversion rate" />
-          <StatCard label="Revenue from referrals"        value="£1,029" valueColor="var(--accent-text)" changeType="neutral" change="This month alone" />
+          <StatCard label="Total referrals"  value={String(total)} valueColor="var(--accent-text)" />
+          <StatCard label="Active referrers" value={String(referrers)} />
+          <StatCard label="Top referrer"     value={top ? (top.nickname || top.name.split(' ')[0]) : '—'} valueColor={top ? 'var(--accent-text)' : undefined} />
         </div>
 
-        {ranked.map((c, i) => {
-          const rank = i + 1;
-          const rankColor = rankColors[rank] ?? 'var(--text3)';
-          return (
-            <div
-              key={c.id}
-              className="flex items-center gap-3.5 px-[18px] py-3.5 rounded-[10px] mb-2"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
-            >
-              <span
-                className="font-serif text-[22px] w-7 text-center flex-shrink-0"
-                style={{ color: rankColor }}
-              >
-                {rank}
-              </span>
+        {loading ? (
+          <p className="text-[13px]" style={{ color: 'var(--text3)' }}>Loading…</p>
+        ) : ranked.length === 0 ? (
+          <div className="px-[18px] py-8 rounded-[10px] text-center text-[13px]" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text3)' }}>
+            No clients yet. Add clients and share their referral links to start tracking.
+          </div>
+        ) : (
+          ranked.map((c, i) => {
+            const rank = i + 1;
+            const rankColor = rankColors[rank] ?? 'var(--text3)';
+            const has = c.referrals > 0;
+            return (
               <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0 mx-1"
-                style={{ background: c.referrals === 0 ? 'var(--bg3)' : 'var(--accent)', color: c.referrals === 0 ? 'var(--text3)' : '#fff' }}
+                key={c.id}
+                className="flex items-center gap-3.5 px-[18px] py-3.5 rounded-[10px] mb-2"
+                style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
               >
-                {c.initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{c.name}</h4>
-                <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
-                  {c.since.replace('Since ', 'Member since ')} · {c.duration}{c.status === 'Paused' ? ' · Paused' : ''}
-                </p>
-              </div>
-              <div className="ml-auto text-right">
+                <span className="font-serif text-[22px] w-7 text-center flex-shrink-0" style={{ color: rankColor }}>
+                  {rank}
+                </span>
                 <div
-                  className="font-serif text-[22px] leading-none"
-                  style={{ color: c.referrals > 0 ? 'var(--accent-text)' : 'var(--text3)' }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0 mx-1 overflow-hidden"
+                  style={{ background: c.avatarUrl ? 'transparent' : (has ? 'var(--accent)' : 'var(--bg3)'), color: has ? '#fff' : 'var(--text3)' }}
                 >
-                  {c.referrals}
+                  {c.avatarUrl ? (
+                    <Image src={c.avatarUrl} alt={c.name} width={28} height={28} className="w-full h-full object-cover" unoptimized />
+                  ) : (
+                    initials(c.name)
+                  )}
                 </div>
-                <div className="text-[11px]" style={{ color: 'var(--text3)' }}>
-                  referral{c.referrals !== 1 ? 's' : ''}
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
+                    {c.name}
+                    {c.nickname && <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · &ldquo;{c.nickname}&rdquo;</span>}
+                  </h4>
+                  <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
+                    {c.since ? c.since.replace('Since ', 'Member since ') : 'New client'}{c.status === 'Paused' ? ' · Paused' : ''}
+                  </p>
+                </div>
+                <div className="ml-auto text-right">
+                  <div className="font-serif text-[22px] leading-none" style={{ color: has ? 'var(--accent-text)' : 'var(--text3)' }}>
+                    {c.referrals}
+                  </div>
+                  <div className="text-[11px]" style={{ color: 'var(--text3)' }}>
+                    referral{c.referrals !== 1 ? 's' : ''}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </>
   );

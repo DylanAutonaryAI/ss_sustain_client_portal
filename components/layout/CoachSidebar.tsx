@@ -18,8 +18,7 @@ export default function CoachSidebar() {
       label: 'Clients',
       items: [
         { label: 'Client Roster',  href: '/coach/clients',   icon: Icons.users },
-        { label: 'Client Health',  href: '/coach/health',    icon: Icons.pulse,   badge: 2, badgeColor: 'var(--red)' },
-        { label: 'Client Messages',href: '/coach/messages',  icon: Icons.message, badge: 3 },
+        { label: 'Client Health',  href: '/coach/health',    icon: Icons.pulse },
       ],
     },
     {
@@ -29,6 +28,12 @@ export default function CoachSidebar() {
         { label: 'Revenue Forecast',    href: '/coach/forecast',    icon: Icons.trendUp  },
         { label: 'Referral Leaderboard',href: '/coach/leaderboard', icon: Icons.users    },
         { label: 'Analytics',           href: '/coach/analytics',   icon: Icons.barChart },
+      ],
+    },
+    {
+      label: 'Community',
+      items: [
+        { label: 'Community Events', href: '/coach/community', icon: Icons.calendar },
       ],
     },
     {
@@ -45,6 +50,7 @@ export default function CoachSidebar() {
       sections={sections}
       userName={user?.name ?? 'Coach'}
       userInitials={user?.initials ?? 'SC'}
+      userAvatar="/samlogo.jpg"
       userRole="Backend dashboard"
       isCoach={true}
     />

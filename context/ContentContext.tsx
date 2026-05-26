@@ -1,11 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supplements as defaultSupplements } from '@/lib/mock-data/supplements';
 import { recordedWebinars as defaultWebinars } from '@/lib/mock-data/webinars';
 import { pdfResources as defaultPdfs } from '@/lib/mock-data/library';
+import { announcements as defaultAnnouncements } from '@/lib/mock-data/announcements';
 import type {
-  Supplement, MindsetTip, GymBagItem, ShoppingItem, NonNegotiable,
+  Announcement, Supplement, MindsetTip, GymBagItem, ShoppingItem, NonNegotiable,
   Webinar, VideoClip, PdfResource, PosingVideo, PosingTip,
 } from '@/lib/types';
 
@@ -91,9 +92,30 @@ const DEFAULT_POSING_TIPS: PosingTip[] = [
   { id: 'pt4', key: 'Mirror work', body: "Film yourself weekly from all angles. What feels right often doesn't look right." },
 ];
 
+// ─── Per-section state that persists to Supabase on change ─────────────────────
+
+// Returns [value, setAndPersist, hydrate]. `setAndPersist` updates local state and
+// writes the whole array to the DB (coach-only on the server). `hydrate` updates
+// local state WITHOUT writing back — used to load DB values on mount.
+function usePersistentSection<T>(key: string, initial: T[]) {
+  const [value, setValue] = useState<T[]>(initial);
+
+  const setAndPersist = useCallback((next: T[]) => {
+    setValue(next);
+    fetch('/api/content', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: next }),
+    }).catch(() => {});
+  }, [key]);
+
+  return [value, setAndPersist, setValue] as const;
+}
+
 // ─── Context type ─────────────────────────────────────────────────────────────
 
 interface ContentContextValue {
+  announcements: Announcement[];  setAnnouncements: (v: Announcement[]) => void;
   supplements:   Supplement[];    setSupplements:   (v: Supplement[])   => void;
   mindsetTips:   MindsetTip[];    setMindsetTips:   (v: MindsetTip[])   => void;
   gymBag:        GymBagItem[];    setGymBag:        (v: GymBagItem[])   => void;
@@ -109,49 +131,46 @@ interface ContentContextValue {
 const ContentContext = createContext<ContentContextValue | null>(null);
 
 export function ContentProvider({ children }: { children: React.ReactNode }) {
-  const [supplements,    setSupplements]    = useState<Supplement[]>(defaultSupplements);
-  const [mindsetTips,    setMindsetTips]    = useState<MindsetTip[]>(DEFAULT_MINDSET);
-  const [gymBag,         setGymBag]         = useState<GymBagItem[]>(DEFAULT_GYM_BAG);
-  const [shopping,       setShopping]       = useState<ShoppingItem[]>(DEFAULT_SHOPPING);
-  const [nonNeg,         setNonNeg]         = useState<NonNegotiable[]>(DEFAULT_NON_NEG);
-  const [webinars,       setWebinars]       = useState<Webinar[]>(defaultWebinars);
-  const [trainingVideos, setTrainingVideos] = useState<VideoClip[]>([]);
-  const [posingVideos,   setPosingVideos]   = useState<PosingVideo[]>(DEFAULT_POSING_VIDEOS);
-  const [posingTips,     setPosingTips]     = useState<PosingTip[]>(DEFAULT_POSING_TIPS);
-  const [pdfResources,   setPdfResources]   = useState<PdfResource[]>(defaultPdfs);
-  const [initialized,    setInitialized]    = useState(false);
+  const [announcements,  setAnnouncements,  hydrateAnnouncements]  = usePersistentSection<Announcement>('announcements', defaultAnnouncements);
+  const [supplements,    setSupplements,    hydrateSupplements]    = usePersistentSection<Supplement>('supplements', defaultSupplements);
+  const [mindsetTips,    setMindsetTips,    hydrateMindsetTips]    = usePersistentSection<MindsetTip>('mindsetTips', DEFAULT_MINDSET);
+  const [gymBag,         setGymBag,         hydrateGymBag]         = usePersistentSection<GymBagItem>('gymBag', DEFAULT_GYM_BAG);
+  const [shopping,       setShopping,       hydrateShopping]       = usePersistentSection<ShoppingItem>('shopping', DEFAULT_SHOPPING);
+  const [nonNeg,         setNonNeg,         hydrateNonNeg]         = usePersistentSection<NonNegotiable>('nonNeg', DEFAULT_NON_NEG);
+  const [webinars,       setWebinars,       hydrateWebinars]       = usePersistentSection<Webinar>('webinars', defaultWebinars);
+  const [trainingVideos, setTrainingVideos, hydrateTrainingVideos] = usePersistentSection<VideoClip>('trainingVideos', []);
+  const [posingVideos,   setPosingVideos,   hydratePosingVideos]   = usePersistentSection<PosingVideo>('posingVideos', DEFAULT_POSING_VIDEOS);
+  const [posingTips,     setPosingTips,     hydratePosingTips]     = usePersistentSection<PosingTip>('posingTips', DEFAULT_POSING_TIPS);
+  const [pdfResources,   setPdfResources,   hydratePdfResources]   = usePersistentSection<PdfResource>('pdfResources', defaultPdfs);
 
+  // Load saved content from the DB on mount; any section the coach has never
+  // saved simply keeps its code default.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('ss-content');
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d.supplements?.length)    setSupplements(d.supplements);
-        if (d.mindsetTips?.length)    setMindsetTips(d.mindsetTips);
-        if (d.gymBag?.length)         setGymBag(d.gymBag);
-        if (d.shopping?.length)       setShopping(d.shopping);
-        if (d.nonNeg?.length)         setNonNeg(d.nonNeg);
-        if (d.webinars?.length)       setWebinars(d.webinars);
-        if (d.trainingVideos)         setTrainingVideos(d.trainingVideos);
-        if (d.posingVideos?.length)   setPosingVideos(d.posingVideos);
-        if (d.posingTips?.length)     setPosingTips(d.posingTips);
-        if (d.pdfResources?.length)   setPdfResources(d.pdfResources);
-      }
-    } catch {}
-    setInitialized(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/content', { cache: 'no-store' });
+        if (!res.ok) return;
+        const { content } = await res.json() as { content: Record<string, unknown> };
+        if (content.announcements  !== undefined) hydrateAnnouncements(content.announcements as Announcement[]);
+        if (content.supplements    !== undefined) hydrateSupplements(content.supplements as Supplement[]);
+        if (content.mindsetTips    !== undefined) hydrateMindsetTips(content.mindsetTips as MindsetTip[]);
+        if (content.gymBag         !== undefined) hydrateGymBag(content.gymBag as GymBagItem[]);
+        if (content.shopping       !== undefined) hydrateShopping(content.shopping as ShoppingItem[]);
+        if (content.nonNeg         !== undefined) hydrateNonNeg(content.nonNeg as NonNegotiable[]);
+        if (content.webinars       !== undefined) hydrateWebinars(content.webinars as Webinar[]);
+        if (content.trainingVideos !== undefined) hydrateTrainingVideos(content.trainingVideos as VideoClip[]);
+        if (content.posingVideos   !== undefined) hydratePosingVideos(content.posingVideos as PosingVideo[]);
+        if (content.posingTips     !== undefined) hydratePosingTips(content.posingTips as PosingTip[]);
+        if (content.pdfResources   !== undefined) hydratePdfResources(content.pdfResources as PdfResource[]);
+      } catch {}
+    })();
+    // hydrate setters are React state setters (stable identities)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!initialized) return;
-    localStorage.setItem('ss-content', JSON.stringify({
-      supplements, mindsetTips, gymBag, shopping, nonNeg,
-      webinars, trainingVideos, posingVideos, posingTips, pdfResources,
-    }));
-  }, [initialized, supplements, mindsetTips, gymBag, shopping, nonNeg,
-      webinars, trainingVideos, posingVideos, posingTips, pdfResources]);
 
   return (
     <ContentContext.Provider value={{
+      announcements, setAnnouncements,
       supplements, setSupplements,
       mindsetTips, setMindsetTips,
       gymBag, setGymBag,

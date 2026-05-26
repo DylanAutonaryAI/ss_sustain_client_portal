@@ -1,13 +1,27 @@
 'use client';
 
+import Image from 'next/image';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
 import ChurnAlert from '@/components/ui/ChurnAlert';
 import { StatusPill, PayTag } from '@/components/ui/Pill';
-import { clients } from '@/lib/mock-data/clients';
+import { useClientRoster } from '@/lib/clients';
+import { usePayments, computeMrr, formatGBP } from '@/lib/payments';
 
 export default function CoachOverviewPage() {
+  const { clients, loading } = useClientRoster();
+  const { payments } = usePayments();
+  const mrr = computeMrr(payments, clients);
   const recent = clients.slice(0, 4);
+  const churnRisk = clients
+    .filter(c => c.healthScore < 40 || c.payment === 'Overdue')
+    .slice(0, 4);
+
+  const activeCount  = clients.filter(c => c.status === 'Active').length;
+  const paymentsDue  = clients.filter(c => c.payment === 'Due' || c.payment === 'Overdue').length;
+  const avgMonths    = clients.length
+    ? clients.reduce((sum, c) => { const m = parseInt(c.duration); return sum + (isNaN(m) ? 0 : m); }, 0) / clients.length
+    : 0;
 
   return (
     <>
@@ -21,25 +35,31 @@ export default function CoachOverviewPage() {
         </p>
 
         <div className="grid grid-cols-4 gap-3 mb-6">
-          <StatCard label="Active clients"      value="67"    change="↑ +3 this month"       changeType="up"  valueColor="var(--accent-text)" />
-          <StatCard label="MRR"                 value="£9,849" change="↑ +4.7% vs last month" changeType="up"  valueColor="var(--accent-text)" />
-          <StatCard label="Payments due"        value="4"     change="Chase before Friday"    changeType="neutral" valueColor="var(--red)" />
-          <StatCard label="Avg client duration" value="4.2mo" change="Retention healthy"      changeType="neutral" />
+          <StatCard label="Active clients"      value={String(activeCount)}      change={`${clients.length} total`}                         changeType="neutral" valueColor="var(--accent-text)" />
+          <StatCard label="MRR"                 value={formatGBP(mrr)}           change="Active clients × current rate"                     changeType="neutral" valueColor="var(--accent-text)" />
+          <StatCard label="Payments due"        value={String(paymentsDue)}      change={paymentsDue > 0 ? 'Needs chasing' : 'All up to date'} changeType="neutral" valueColor={paymentsDue > 0 ? 'var(--red)' : 'var(--accent-text)'} />
+          <StatCard label="Avg client duration" value={`${avgMonths.toFixed(1)}mo`} change="From join dates"                                 changeType="neutral" />
         </div>
 
         <div className="flex items-center justify-between mb-3">
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>⚠ Churn risk alerts</span>
         </div>
-        <ChurnAlert
-          icon="🔴"
-          title="Tom H. — 14 days since last login"
-          body="Payment due in 3 days. No portal activity in 2 weeks. High churn risk — message him now before the billing date."
-        />
-        <ChurnAlert
-          icon="🟡"
-          title="Aaron K. — paused, 10 days inactive"
-          body="Currently paused. No engagement since pausing. Risk of full cancellation — worth a check-in."
-        />
+        {churnRisk.map(c => (
+          <ChurnAlert
+            key={c.id}
+            icon={c.payment === 'Overdue' ? '🔴' : '🟡'}
+            title={`${c.name} — health score ${c.healthScore}`}
+            body={`${c.payment === 'Overdue' ? 'Payment overdue. ' : c.payment === 'Due' ? 'Payment due soon. ' : ''}Last activity: ${c.lastLogin === 'Never' ? 'never logged in' : c.lastLogin.toLowerCase()}. Worth a check-in.`}
+          />
+        ))}
+        {!loading && churnRisk.length === 0 && (
+          <div
+            className="px-[18px] py-3.5 mb-2 rounded-[10px] text-[13px]"
+            style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent-text)' }}
+          >
+            ✓ No churn risks right now — everyone&apos;s active and paid up.
+          </div>
+        )}
 
         <div className="h-px my-6" style={{ background: 'var(--border)' }} />
 
@@ -69,13 +89,22 @@ export default function CoachOverviewPage() {
             >
               <div className="flex items-center gap-2.5">
                 <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0"
-                  style={{ background: 'var(--accent)' }}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0 overflow-hidden"
+                  style={{ background: c.avatarUrl ? 'transparent' : 'var(--accent)' }}
                 >
-                  {c.initials}
+                  {c.avatarUrl ? (
+                    <Image src={c.avatarUrl} alt={c.name} width={28} height={28} className="w-full h-full object-cover" unoptimized />
+                  ) : (
+                    c.initials
+                  )}
                 </div>
                 <div>
-                  <div className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{c.name}</div>
+                  <div className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
+                    {c.name}
+                    {c.nickname && (
+                      <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · &ldquo;{c.nickname}&rdquo;</span>
+                    )}
+                  </div>
                   <div className="text-[11px]" style={{ color: 'var(--text3)' }}>{c.since}</div>
                 </div>
               </div>
@@ -85,6 +114,16 @@ export default function CoachOverviewPage() {
               <div><PayTag status={c.payment} /></div>
             </div>
           ))}
+          {loading && (
+            <div className="px-5 py-7 text-center text-[13px]" style={{ color: 'var(--text3)' }}>
+              Loading clients…
+            </div>
+          )}
+          {!loading && recent.length === 0 && (
+            <div className="px-5 py-7 text-center text-[13px]" style={{ color: 'var(--text3)' }}>
+              No clients yet. Add your first one from the Client Roster.
+            </div>
+          )}
         </div>
       </div>
     </>
