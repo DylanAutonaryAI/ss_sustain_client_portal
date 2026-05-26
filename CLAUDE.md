@@ -6,6 +6,41 @@ business run by Sam Sutton. It replaces his current Notion client area.
 Two types of user: CLIENTS and the COACH (Sam). Built to look coherent
 with the SS Sustain landing page and brand (same logo, fonts, colours).
 
+---
+
+## CURRENT STATUS (updated 2026-05-26)
+Phase 1 is essentially done. The HTML prototype is now a working Next.js 14
+app with the brand design (dark/light toggle, fonts, colours), both the
+client portal and coach backend, deployed on Vercel. GitHub repo:
+`DylanAutonaryAI/ss_sustain_client_portal` (auto-deploys on push to `master`).
+
+**Supabase IS now wired up** — the older notes below that say "not wired up
+yet / do not set up Supabase" are OUTDATED. What's live:
+- Auth: email/password login, role-gated tabs (client vs coach), middleware
+  route protection, `get_my_role` RPC, `profiles` + `clients` tables.
+- Coach "Add client" sends a Supabase invite email; the client sets their
+  password at `/auth/callback` → `/api/set-password`. Forgot-password works too.
+- Email delivery: **Resend**, configured as Supabase's custom SMTP. Sending to
+  arbitrary recipients requires a **verified domain in Resend** — the sandbox
+  `onboarding@resend.dev` sender only delivers to the Resend account owner.
+- API routes back most features: clients, community, content, payments,
+  referral, profile, password reset/update.
+- Still on mock/seed data: onboarding flow, `ClientContext`, `ContentContext`.
+
+**Env vars** (NOT in git — set per machine via `.env.local`, or `vercel env pull`):
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`.
+
+**Done in the 2026-05-26 session:**
+- Fixed invite acceptance always showing "expired" (React StrictMode was
+  double-running the callback effect and wiping the URL token).
+- Hardened logout to clear the session client-side; `AuthProvider` no longer
+  breaks on a stale/revoked session.
+- Role-gated the login tabs (clients sign in under Client, coaches under Coach).
+- Sidebar logo/title links to the role's home, with a hover state.
+
+---
+
 ## Architecture
 One app, one login. After authentication, check the user's role and
 route COACH to the backend dashboard and CLIENTS to the portal. Build
@@ -15,17 +50,17 @@ login with the same controls.
 
 ## Tech stack (target)
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
-- Supabase for auth + database (NOT wired up yet — mock data for now)
+- Supabase for auth + database (NOW WIRED UP — see CURRENT STATUS above)
 - Vercel for hosting
 - Will later add Stripe, Make automations, Voiceflow AI agent
 - Investigate making it installable as a PWA ("add to home screen")
   so it feels like an app. For now it's a website.
 
-## Current goal (PHASE 1)
+## Original goal (PHASE 1 — now largely complete; kept for context)
 Convert the existing HTML prototype (ss-sustain-portal-v3.html) into a
 proper Next.js app with reusable components. Keep the EXACT visual
-design — fonts, colours, dark/light toggle, layout. Use mock data for
-now. Do NOT set up Supabase yet.
+design — fonts, colours, dark/light toggle, layout. (This was done with mock
+data first; Supabase has since been wired up — see CURRENT STATUS above.)
 
 Priority for phase 1 is simply transferring everything from Sam's Notion
 into this portal and getting it working perfectly, so he can smoothly
