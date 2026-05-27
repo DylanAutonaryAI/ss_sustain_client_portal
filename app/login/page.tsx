@@ -47,6 +47,9 @@ export default function LoginPage() {
       return;
     }
 
+    // Fresh login → clear any leftover onboarding skip so the flow shows again
+    // every time (testing mode). Harmless in prod once ONBOARDING_TEST_MODE is off.
+    sessionStorage.removeItem('ss-dev-skip');
     window.location.href = role === 'coach' ? '/coach/overview' : '/portal/home';
   }
 
