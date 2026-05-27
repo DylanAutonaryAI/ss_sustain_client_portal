@@ -36,8 +36,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     let cancelled = false;
     fetch('/api/onboarding/me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
+      .then(async (r) => {
+        const data = r.ok ? await r.json() : null;
         if (cancelled) return;
         // Only gate real clients; coaches / accounts without a client row pass through.
         const isClient = !!data?.isClient;
@@ -46,11 +46,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         // this session. At go-live (flag off): gate only until they've completed it.
         const testMode = ONBOARDING_TEST_MODE || process.env.NODE_ENV === 'development';
         const skipped = testMode && sessionStorage.getItem('ss-dev-skip');
-        const needsOnboarding = isClient && (testMode ? !skipped : !data.completedAt);
+        const needsOnboarding = isClient && (testMode ? !skipped : !data?.completedAt);
+        // TEMP debug — remove once onboarding gating is confirmed.
+        console.log('[onboarding-gate]', { status: r.status, isClient, testMode, skipped: !!skipped, needsOnboarding, completedAt: data?.completedAt });
         if (needsOnboarding) router.push('/onboarding');
         else setGateChecked(true);
       })
-      .catch(() => { if (!cancelled) setGateChecked(true); }); // fail open on a network blip
+      .catch((e) => { console.log('[onboarding-gate] error', e); if (!cancelled) setGateChecked(true); }); // fail open on a network blip
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
