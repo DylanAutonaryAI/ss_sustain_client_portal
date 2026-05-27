@@ -9,36 +9,44 @@ import { ONBOARDING_STEP_KEYS } from '@/lib/onboarding';
 
 // GET → { completed: string[], completedAt: string | null, isClient: boolean }
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // TEMP: wrapped so any thrown error (e.g. missing SUPABASE_SERVICE_ROLE_KEY →
+  // "supabaseKey is required") is surfaced to the client instead of a bare 500.
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized', isClient: false, _debug: { caught: 'no user' } });
 
-  const admin = await createAdminClient();
-  const { data: client, error: clientErr } = await admin
-    .from('clients')
-    .select('id, onboarding_completed_at')
-    .eq('user_id', user.id)
-    .maybeSingle();
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const admin = await createAdminClient();
+    const { data: client, error: clientErr } = await admin
+      .from('clients')
+      .select('id, onboarding_completed_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-  // TEMP debug — who does the server think is logged in, and did the query error?
-  const _debug = { user: user.email, uid: user.id, err: clientErr?.message ?? null };
+    const _debug = { user: user.email, uid: user.id, err: clientErr?.message ?? null, hasServiceKey };
 
-  // No client row (e.g. a coach) → onboarding doesn't apply.
-  if (!client) {
-    return NextResponse.json({ completed: [], completedAt: null, isClient: false, _debug });
+    if (!client) {
+      return NextResponse.json({ completed: [], completedAt: null, isClient: false, _debug });
+    }
+
+    const { data: rows } = await admin
+      .from('onboarding_progress')
+      .select('step_key')
+      .eq('client_id', client.id);
+
+    return NextResponse.json({
+      completed: (rows ?? []).map((r) => r.step_key),
+      completedAt: client.onboarding_completed_at,
+      isClient: true,
+      _debug,
+    });
+  } catch (e) {
+    return NextResponse.json({
+      isClient: false,
+      _debug: { caught: e instanceof Error ? e.message : String(e), hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY },
+    });
   }
-
-  const { data: rows } = await admin
-    .from('onboarding_progress')
-    .select('step_key')
-    .eq('client_id', client.id);
-
-  return NextResponse.json({
-    completed: (rows ?? []).map((r) => r.step_key),
-    completedAt: client.onboarding_completed_at,
-    isClient: true,
-    _debug,
-  });
 }
 
 // POST { step_key } → marks one step done, and stamps onboarding_completed_at
