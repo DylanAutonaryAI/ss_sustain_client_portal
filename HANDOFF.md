@@ -15,14 +15,15 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-27)
-Two workstreams landed and were pushed together: (1) the **client onboarding flow made
-real** (engine + coach visibility; still gated on SQL + Sam's content — see Active), and
-(2) the **coach Analytics page made real + portal view tracking**, which also surfaced
-and fixed a **critical client-login auth deadlock** and the portal onboarding-gate
-infinite-"Loading" loop (see Recently done). Verified deploy-safe (tsc + lint clean) and
-pushed to `master`. Workflow reminder: `git pull` at start → work in ONE place → "update
-the handoff and push" at end. (Cross-machine setup is in `CLAUDE.md`.)
+## 📌 Latest handoff note (2026-05-27, late)
+Most recent event: a **production 500 fire** — the edge `middleware.ts` kept throwing
+`MIDDLEWARE_INVOCATION_FAILED` and taking the whole site down, so it was **removed
+entirely** (commit bf9ebf0). Auth still holds (API routes 401, login redirects
+client-side) but **server-side route protection is gone and needs reinstating** — see
+Still to do / Watch out. Before that, this session added **UI / motion polish** and
+**onboarding UX** (inline Loom video embeds, dev testing mode, team photo) — see Recently
+done. Working tree is clean (all committed). Workflow reminder: `git pull` at start →
+work in ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally first.
 
 ---
@@ -36,8 +37,13 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   - `lib/onboarding.ts` — canonical steps, stable keys (replaces the deleted
     `lib/mock-data/onboarding.ts`); steps needing real content flagged `placeholder`.
   - `app/api/onboarding/me/route.ts` — GET progress / POST mark-step + stamp completion.
-  - `app/onboarding/page.tsx` — wired to the API; sequential open-then-confirm;
-    resumes cross-device; **admin-skip removed**.
+  - `app/onboarding/page.tsx` — wired to the API; videos **embed inline** (Loom
+    share URL → embed via `loomEmbedUrl`); community step shows the **team photo**
+    (`/images/team.JPG`, via new `OnboardingStep.image`). **DEV testing mode**: in
+    `NODE_ENV==='development'` the gate always routes a client to onboarding (ignores
+    `completedAt`) with a **bypass button** (`ss-dev-skip` session flag, cleared on
+    logout); **prod has no skip** and gates only until completed. All dev-only bits are
+    stripped from the prod build.
   - `app/portal/layout.tsx` — gate now reads the DB, not the browser.
   - `app/coach/clients/page.tsx` — roster shows onboarding status (Not started /
     N of M / Onboarded ✓ + date). Sam's in-portal proof.
@@ -68,6 +74,31 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-27 (late) — Production 500 fire: edge middleware removed.**
+  - Commits `01646f6` (harden middleware to fail-open) → `e95c1c0` (drop Supabase SDK
+    from the edge) → `bf9ebf0` (**delete `middleware.ts` entirely**). Even a trivial
+    SDK-free middleware kept throwing `MIDDLEWARE_INVOCATION_FAILED` and 500-ing every
+    route on this Vercel project. Removing it got the site serving.
+  - Auth still enforced: every API route validates the session (401), and login redirects
+    client-side; the portal/coach **layouts** still gate by role/onboarding on the client.
+  - **Server-side route protection is gone** — to be reinstated once the edge issue is
+    understood (see Still to do).
+- **2026-05-27 — UI / motion polish + onboarding UX (this session).**
+  - **Motion foundation** in `app/globals.css`: shared `animate-fade-up / fade-in /
+    scale-in / slide-down / accordion / page` utilities + a `prefers-reduced-motion`
+    kill-switch. Clean & quick (150–300ms, ease-out).
+  - **Page transitions** via `app/portal/template.tsx` + `app/coach/template.tsx` —
+    content crossfades on navigation, sidebar stays put. **Opacity-ONLY on purpose:** a
+    transform there becomes the containing block for `position:fixed` modals and breaks
+    their full-screen overlay (hit + fixed this — see Watch out).
+  - **Roster row** opens as a smooth accordion; **Add-client modal** fades+scales in.
+  - **Count-up numbers** — `components/ui/CountUp.tsx` (`useCountUp` + `AnimatedStat`
+    that parses £/%/decimals). Wired into the shared `StatCard`, so **every stat card**
+    (Overview/Analytics/Revenue/Forecast/Health) counts up; plus analytics bars + key
+    metrics + forecast 3-month projection.
+  - **Revenue "Cash position" donut** — `components/ui/Donut.tsx` (pure SVG, sweeps in):
+    collected (green) vs outstanding (amber), % collected in the centre.
+  - Onboarding: inline Loom embeds, team photo, and the dev testing mode (see Active).
 - **2026-05-27 (computer) — Sidebar notification ticker + client status/cancellation.**
   - **Notification badges** (`lib/notifications.ts` + both sidebars): per-tab unseen counts.
     Badge = items whose id you haven't seen; **opening the tab clears it**; a new item
@@ -170,6 +201,9 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   logout/AuthProvider hardening.
 
 ## ⏭️ Still to do
+- **Reinstate server-side route protection** — `middleware.ts` was deleted after edge
+  500s. Today protection is client-side only (layouts) + API 401s. Re-add once the edge
+  `MIDDLEWARE_INVOCATION_FAILED` cause is understood (or do it without edge middleware).
 - **Social / meal tracker — the next big feature** (per CLAUDE.md, Sam-requested, top
   engagement priority). Per-client logging Sam can click into to see if they logged.
   **Blocked on Sam sending his current tracker** so we know what it captures.
@@ -181,6 +215,12 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   the top-bar currently uses the `goal` field as the phase.
 
 ## ⚠️ Watch out
+- **No edge middleware** — `middleware.ts` was removed (it 500'd the whole site). Don't
+  re-add an edge middleware without solving `MIDDLEWARE_INVOCATION_FAILED` first, or the
+  site goes down. Route protection is currently client-side only.
+- **Page transitions must stay opacity-only.** `template.tsx` uses `animate-page` (fade,
+  no transform). A `transform` on those wrappers becomes the containing block for any
+  `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
 - **Applied ✅ (verified by query):** `db/2026-05-27_onboarding_progress.sql`,
   `db/2026-05-27_page_views.sql`, `db/2026-05-27_referral.sql`, and `last_login`.
   If Vercel ever points at a *different* Supabase than local `.env.local`, re-run them there.
@@ -193,4 +233,4 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
 
 ---
 
-**Last updated:** 2026-05-27 — notifications + client status session (computer)
+**Last updated:** 2026-05-27 — UI/motion polish + onboarding UX; logged the edge-middleware 500 removal
