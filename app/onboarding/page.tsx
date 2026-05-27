@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ONBOARDING_STEPS, ONBOARDING_STEP_KEYS } from '@/lib/onboarding';
+import { ONBOARDING_STEPS, ONBOARDING_STEP_KEYS, ONBOARDING_TEST_MODE } from '@/lib/onboarding';
 import SsLogo from '@/components/ui/SsLogo';
 
-const IS_DEV = process.env.NODE_ENV === 'development';
+// Testing behaviour (start fresh every login + admin skip button) is on whenever
+// ONBOARDING_TEST_MODE is set, OR in local dev. Flip ONBOARDING_TEST_MODE off at
+// go-live and this reverts to "show onboarding only until completed, no skip".
+const IS_DEV = ONBOARDING_TEST_MODE || process.env.NODE_ENV === 'development';
 
 // Turn a Loom share URL into its embeddable player URL, so the video plays inline
 // in the portal (showing Loom's own thumbnail) instead of opening a new tab.
@@ -407,9 +410,11 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* DEV-ONLY bypass — lets you into the portal without walking the flow.
-            Stripped from production builds (NODE_ENV is 'production' there), so a real
-            client never sees it. Sets a session flag the portal gate honours in dev. */}
+        {/* ADMIN SKIP — visible while ONBOARDING_TEST_MODE is on (so the flow can be
+            tested on the live site). Sets a per-session flag the portal gate honours,
+            dropping you into the portal without walking the flow; cleared on logout so
+            onboarding shows again on the next login. ⚠️ Set ONBOARDING_TEST_MODE=false
+            at go-live and this button disappears. */}
         {IS_DEV && (
           <div className="mt-8 pt-5 flex justify-center" style={{ borderTop: '1px solid var(--border)' }}>
             <button
@@ -419,7 +424,7 @@ export default function OnboardingPage() {
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text2)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; }}
             >
-              Bypass onboarding → portal (dev only · never shown to clients)
+              Skip onboarding → portal (admin · testing only, remove at go-live)
             </button>
           </div>
         )}

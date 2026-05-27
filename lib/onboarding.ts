@@ -1,5 +1,13 @@
 import type { OnboardingStep } from '@/lib/types';
 
+// ⚠️ TESTING MODE — set to FALSE at go-live (and delete the admin skip button).
+// When true, a CLIENT is routed through onboarding on EVERY login regardless of
+// whether they've completed it, and the onboarding page shows an admin "Skip for
+// now" button (a per-session bypass). This runs in PRODUCTION too — not just
+// localhost — so the flow can be tested on the live site. When false: onboarding
+// shows only until the client completes it once, and there's no skip button.
+export const ONBOARDING_TEST_MODE = true;
+
 // ─── Canonical onboarding steps ──────────────────────────────────────────────
 //
 // This is the single source of truth for the onboarding flow. Both the client

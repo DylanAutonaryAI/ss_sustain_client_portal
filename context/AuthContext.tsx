@@ -102,16 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Kept for backwards compatibility — not used in practice now
-  const login = (_role: UserRole) => {};
+  const login = () => {};
 
   const logout = async () => {
-    // Clear the session on the client so the auth cookies are actually removed —
-    // the server redirect route can't reliably attach cleared cookies to a
-    // NextResponse.redirect, which leaves a stale session that breaks /login.
-    try { await supabase.auth.signOut(); } catch { /* ignore — navigate anyway */ }
+    // Clear local state first so the UI is logged-out immediately.
     localStorage.removeItem('ss-user');
     localStorage.removeItem('ss-onboarding-done');
-    sessionStorage.removeItem('ss-dev-skip'); // dev bypass — so every fresh login re-shows onboarding
+    sessionStorage.removeItem('ss-dev-skip'); // so every fresh login re-shows onboarding
+    sessionStorage.removeItem('ss-activity-stamped');
+    // Sign out to clear the auth cookies — but NEVER let a hung/locked signOut
+    // block the redirect (that's what made the sign-out button "do nothing").
+    // Race it against a short timeout, then navigate regardless.
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 2500)),
+      ]);
+    } catch { /* ignore — navigate anyway */ }
     window.location.href = '/login';
   };
 

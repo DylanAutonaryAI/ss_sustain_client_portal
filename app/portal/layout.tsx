@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { ONBOARDING_TEST_MODE } from '@/lib/onboarding';
 import ClientSidebar from '@/components/layout/ClientSidebar';
 
 // Sections whose record_page_view call is currently in flight, so a StrictMode
@@ -40,13 +41,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         if (cancelled) return;
         // Only gate real clients; coaches / accounts without a client row pass through.
         const isClient = !!data?.isClient;
-        const dev = process.env.NODE_ENV === 'development';
-        // DEV testing mode: always send the client through onboarding so it can be
-        // tested on every login, UNLESS they've hit the bypass for this session.
-        // PROD: gate only until they've actually completed it. Both are stripped to
-        // the prod branch in the build, so a real client can never see the bypass.
-        const devSkip = dev && sessionStorage.getItem('ss-dev-skip');
-        const needsOnboarding = isClient && (dev ? !devSkip : !data.completedAt);
+        // TESTING MODE (ONBOARDING_TEST_MODE, or local dev): always send the client
+        // through onboarding on every login UNLESS they've hit the admin skip for
+        // this session. At go-live (flag off): gate only until they've completed it.
+        const testMode = ONBOARDING_TEST_MODE || process.env.NODE_ENV === 'development';
+        const skipped = testMode && sessionStorage.getItem('ss-dev-skip');
+        const needsOnboarding = isClient && (testMode ? !skipped : !data.completedAt);
         if (needsOnboarding) router.push('/onboarding');
         else setGateChecked(true);
       })
