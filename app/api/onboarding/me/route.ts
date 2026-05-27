@@ -14,15 +14,18 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const admin = await createAdminClient();
-  const { data: client } = await admin
+  const { data: client, error: clientErr } = await admin
     .from('clients')
     .select('id, onboarding_completed_at')
     .eq('user_id', user.id)
     .maybeSingle();
 
+  // TEMP debug — who does the server think is logged in, and did the query error?
+  const _debug = { user: user.email, uid: user.id, err: clientErr?.message ?? null };
+
   // No client row (e.g. a coach) → onboarding doesn't apply.
   if (!client) {
-    return NextResponse.json({ completed: [], completedAt: null, isClient: false });
+    return NextResponse.json({ completed: [], completedAt: null, isClient: false, _debug });
   }
 
   const { data: rows } = await admin
@@ -34,6 +37,7 @@ export async function GET() {
     completed: (rows ?? []).map((r) => r.step_key),
     completedAt: client.onboarding_completed_at,
     isClient: true,
+    _debug,
   });
 }
 

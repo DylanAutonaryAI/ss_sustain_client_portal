@@ -48,7 +48,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         const skipped = testMode && sessionStorage.getItem('ss-dev-skip');
         const needsOnboarding = isClient && (testMode ? !skipped : !data?.completedAt);
         // TEMP debug — remove once onboarding gating is confirmed.
-        console.log('[onboarding-gate]', { status: r.status, isClient, testMode, skipped: !!skipped, needsOnboarding, completedAt: data?.completedAt });
+        console.log('[onboarding-gate]', { status: r.status, isClient, testMode, skipped: !!skipped, needsOnboarding, completedAt: data?.completedAt, server: data?._debug });
         if (needsOnboarding) router.push('/onboarding');
         else setGateChecked(true);
       })
