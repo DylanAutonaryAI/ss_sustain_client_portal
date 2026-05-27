@@ -68,6 +68,22 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-27 (computer) — Sidebar notification ticker + client status/cancellation.**
+  - **Notification badges** (`lib/notifications.ts` + both sidebars): per-tab unseen counts.
+    Badge = items whose id you haven't seen; **opening the tab clears it**; a new item
+    re-lights it. Pure localStorage per-browser, no DB. Coach: Roster (new clients),
+    **Health (churn, red)**, Referrals (new leads). Client: events, training, posing,
+    mindset, supplements, recommendations, webinars, library. NOTE: on first load it
+    badges *everything* (nothing "seen" yet) and clears as you click in — flip it to
+    seed-a-baseline if that's too noisy. Replaced the community pending-RSVP badge and
+    Training's static "New".
+  - **Client status → Active / Paused / Cancelled + reason** (`clients/page.tsx`, `Pill`,
+    `lib/types` `ClientStatus`). Paused/Cancelled record a preset reason + optional note;
+    roster stat cards now Active/Paused/Cancelled; Cancelled pill is red. Needs the new SQL
+    (see Watch out).
+  - **Phase is now a dropdown** (Fat loss / Gaining / Maintenance + custom) in the roster
+    and Add-client modal, replacing free text.
+  - Confirmed **Delete client** removes the clients row + auth login + onboarding rows from Supabase.
 - **2026-05-27 (later) — Referral polish + platform additions (this push).**
   - Referral: coach can **delete** a lead (✕ → confirm) and the leaderboard / earned /
     pending / totals all recompute from `referral_leads`; **client-facing team leaderboard**
@@ -168,12 +184,13 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
 - **Applied ✅ (verified by query):** `db/2026-05-27_onboarding_progress.sql`,
   `db/2026-05-27_page_views.sql`, `db/2026-05-27_referral.sql`, and `last_login`.
   If Vercel ever points at a *different* Supabase than local `.env.local`, re-run them there.
-- **`db/2026-05-27_client_status_reason.sql` — NOT yet verified.** New migration from the
-  onboarding session (pause-reason on clients). Run it / confirm it's applied, or that
-  feature will error on the missing column.
+- **`db/2026-05-27_client_status_reason.sql` — RUN IN SUPABASE (not yet verified).** Adds
+  `status_reason` + `status_note` to `clients` for the new Paused/Cancelled reasons. Until
+  applied, saving a Paused/Cancelled client errors. (If a CHECK constraint blocks the
+  'Cancelled' value, drop it — see the note in the SQL file.)
 - Invite emails: Resend sandbox sender only reaches the Resend account owner until a
   domain is verified in Resend + the Supabase SMTP "from" is updated.
 
 ---
 
-**Last updated:** 2026-05-27 — referral scheme + polish session (computer)
+**Last updated:** 2026-05-27 — notifications + client status session (computer)
