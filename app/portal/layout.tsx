@@ -39,7 +39,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       .then((data) => {
         if (cancelled) return;
         // Only gate real clients; coaches / accounts without a client row pass through.
-        if (data?.isClient && !data.completedAt) router.push('/onboarding');
+        const isClient = !!data?.isClient;
+        const dev = process.env.NODE_ENV === 'development';
+        // DEV testing mode: always send the client through onboarding so it can be
+        // tested on every login, UNLESS they've hit the bypass for this session.
+        // PROD: gate only until they've actually completed it. Both are stripped to
+        // the prod branch in the build, so a real client can never see the bypass.
+        const devSkip = dev && sessionStorage.getItem('ss-dev-skip');
+        const needsOnboarding = isClient && (dev ? !devSkip : !data.completedAt);
+        if (needsOnboarding) router.push('/onboarding');
         else setGateChecked(true);
       })
       .catch(() => { if (!cancelled) setGateChecked(true); }); // fail open on a network blip

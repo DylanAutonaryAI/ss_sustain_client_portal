@@ -17,15 +17,19 @@ export async function GET() {
   const clients = clientRows ?? [];
   const ids = clients.map(c => c.id);
 
-  // Count leads per referrer
-  const counts: Record<string, number> = {};
+  // Rank by CONVERSIONS (people who actually joined — the £100-earning metric),
+  // and keep total leads as a secondary signal.
+  const counts: Record<string, number> = {};      // converted referrals
+  const leadCounts: Record<string, number> = {};   // all leads (enquiries)
   if (ids.length) {
     const { data: leads } = await admin
       .from('referral_leads')
-      .select('referrer_id')
+      .select('referrer_id, status')
       .in('referrer_id', ids);
     for (const l of leads ?? []) {
-      if (l.referrer_id) counts[l.referrer_id] = (counts[l.referrer_id] ?? 0) + 1;
+      if (!l.referrer_id) continue;
+      leadCounts[l.referrer_id] = (leadCounts[l.referrer_id] ?? 0) + 1;
+      if (l.status === 'converted') counts[l.referrer_id] = (counts[l.referrer_id] ?? 0) + 1;
     }
   }
 
@@ -43,14 +47,16 @@ export async function GET() {
       name: c.full_name || 'Unnamed',
       since: c.since || '',
       status: c.status as string,
-      referrals: counts[c.id] ?? 0,
+      referrals: counts[c.id] ?? 0,      // converted (joined) — the £100-earning ones
+      leads: leadCounts[c.id] ?? 0,       // all enquiries via their link
       avatarUrl: c.user_id ? profiles[c.user_id]?.avatar_url ?? null : null,
       nickname: c.user_id ? profiles[c.user_id]?.nickname ?? null : null,
     }))
-    .sort((a, b) => b.referrals - a.referrals || a.name.localeCompare(b.name));
+    .sort((a, b) => b.referrals - a.referrals || b.leads - a.leads || a.name.localeCompare(b.name));
 
   const totalReferrals = Object.values(counts).reduce((a, b) => a + b, 0);
+  const totalLeads = Object.values(leadCounts).reduce((a, b) => a + b, 0);
   const referrers = Object.values(counts).filter(n => n > 0).length;
 
-  return NextResponse.json({ ranked, totalReferrals, referrers });
+  return NextResponse.json({ ranked, totalReferrals, totalLeads, referrers });
 }

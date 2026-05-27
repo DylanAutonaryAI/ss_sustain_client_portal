@@ -51,7 +51,7 @@ export interface PdfResource {
 }
 
 export type PaymentStatus = 'Paid' | 'Due' | 'Overdue';
-export type ClientStatus = 'Active' | 'Paused';
+export type ClientStatus = 'Active' | 'Paused' | 'Cancelled';
 
 export interface Client {
   id: string;
@@ -69,6 +69,8 @@ export interface Client {
   notes: string;
   nextPaymentDate?: string; // YYYY-MM-DD — drives auto Paid/Due/Overdue
   programStart?: string; // YYYY-MM-DD — start of current phase; drives the portal week count
+  statusReason?: string; // preset reason a client was paused/cancelled
+  statusNote?: string;   // optional free-text note expanding on statusReason
   // Synced from the client's own profile (profiles table) when they have a login
   avatarUrl?: string;
   nickname?: string;
@@ -146,6 +148,7 @@ export interface OnboardingStep {
   actionLabel?: string;   // label for the "open the link" button
   confirmLabel?: string;  // label for the "mark complete" button (overrides the default)
   url?: string;
+  image?: string;         // optional hero image (public path) shown in place of the doc/action icon
   placeholder?: boolean;  // true = still needs Sam's real video/link/PDF
 }
 

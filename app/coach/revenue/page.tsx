@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
+import AnimatedStat from '@/components/ui/CountUp';
+import Donut from '@/components/ui/Donut';
 import { useClientRoster } from '@/lib/clients';
 import { usePayments, computeMrr, formatGBP as GBP } from '@/lib/payments';
 import type { PaymentStatus } from '@/lib/types';
@@ -94,6 +96,52 @@ export default function RevenuePage() {
           <StatCard label="Collected this month" value={GBP(collected)}   changeType="neutral" change={`${outstandingList.length} outstanding`} valueColor="var(--accent-text)" />
           <StatCard label="Outstanding"          value={GBP(outstanding)} changeType={outstanding > 0 ? 'down' : 'neutral'} change={outstanding > 0 ? 'Chase before billing' : 'Nothing outstanding'} valueColor={outstanding > 0 ? 'var(--red)' : 'var(--accent-text)'} />
           <StatCard label="YTD revenue"          value={GBP(ytd)}         changeType="neutral" change={`${thisYear} to date`}                  valueColor="var(--accent-text)" />
+        </div>
+
+        {/* Cash position — collected vs outstanding donut */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Cash position</span>
+        </div>
+        <div
+          className="rounded-xl p-6 mb-6 flex items-center gap-8 flex-wrap"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+        >
+          <Donut segments={[{ value: collected, color: 'var(--accent)' }, { value: outstanding, color: 'var(--amber)' }]}>
+            {collected + outstanding > 0 ? (
+              <>
+                <span className="font-serif text-[24px] leading-none" style={{ color: 'var(--text)' }}>
+                  <AnimatedStat text={`${Math.round((collected / (collected + outstanding)) * 100)}%`} />
+                </span>
+                <span className="text-[10px] mt-1 uppercase tracking-[0.6px]" style={{ color: 'var(--text3)' }}>collected</span>
+              </>
+            ) : (
+              <span className="text-[11px] px-3" style={{ color: 'var(--text3)' }}>No revenue yet</span>
+            )}
+          </Donut>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent)' }} />
+                <span className="text-[12px]" style={{ color: 'var(--text2)' }}>Collected this month</span>
+              </div>
+              <div className="font-serif text-[20px] mt-0.5" style={{ color: 'var(--accent-text)' }}>
+                <AnimatedStat text={GBP(collected)} />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--amber)' }} />
+                <span className="text-[12px]" style={{ color: 'var(--text2)' }}>Outstanding (owed)</span>
+              </div>
+              <div className="font-serif text-[20px] mt-0.5" style={{ color: outstanding > 0 ? 'var(--amber)' : 'var(--text)' }}>
+                <AnimatedStat text={GBP(outstanding)} />
+              </div>
+            </div>
+            <p className="text-[11px] max-w-[280px] leading-relaxed" style={{ color: 'var(--text3)' }}>
+              How much of your billed revenue is in the bank versus still owed.
+            </p>
+          </div>
         </div>
 
         {/* Add payment */}

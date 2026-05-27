@@ -72,6 +72,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     actionLabel: 'Open WhatsApp group',
     confirmLabel: "✓ I've joined",
     url: 'https://chat.whatsapp.com/EWh13rWP2jnFh7aOpY3RbD?s=cl&p=i&mlu=0',
+    image: '/images/team.JPG',
   },
 ];
 

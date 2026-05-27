@@ -2,8 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ONBOARDING_STEPS } from '@/lib/onboarding';
+import Image from 'next/image';
+import { ONBOARDING_STEPS, ONBOARDING_STEP_KEYS } from '@/lib/onboarding';
 import SsLogo from '@/components/ui/SsLogo';
+
+const IS_DEV = process.env.NODE_ENV === 'development';
+
+// Turn a Loom share URL into its embeddable player URL, so the video plays inline
+// in the portal (showing Loom's own thumbnail) instead of opening a new tab.
+function loomEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/loom\.com\/share\/([a-zA-Z0-9-]+)/);
+  return m ? `https://www.loom.com/embed/${m[1]}` : null;
+}
 
 export default function OnboardingPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -18,12 +29,17 @@ export default function OnboardingPage() {
   const total = ONBOARDING_STEPS.length;
   const step = ONBOARDING_STEPS[currentIdx];
   const isComplete = completed.has(step.id);
-  const isOpened = opened.has(step.id) || !step.url; // nothing to open → ready to confirm
+  const embedUrl = step.type === 'video' ? loomEmbedUrl(step.url) : null;
+  // Ready to confirm when there's nothing to open first: an embedded video plays
+  // inline, a placeholder has no link, or a doc/action link has already been opened.
+  const isOpened = opened.has(step.id) || !step.url || !!embedUrl;
   const allDone = completedAt !== null;
 
   // Hydrate progress from the server so a returning / cross-device client picks
-  // up exactly where they left off.
+  // up exactly where they left off. In DEV we deliberately start fresh every time
+  // (ignore saved progress) so the flow can be walked end-to-end on each login.
   useEffect(() => {
+    if (IS_DEV) { setLoading(false); return; }
     let active = true;
     (async () => {
       try {
@@ -67,8 +83,19 @@ export default function OnboardingPage() {
         setError(data.error || 'Could not save your progress. Try again.');
         return;
       }
-      setCompleted(new Set<string>(data.completed ?? []));
-      setCompletedAt(data.completedAt ?? null);
+      if (IS_DEV) {
+        // Track only this session's steps so old test rows still in the DB don't
+        // make a fresh walk-through look already-done. (POST above still records
+        // it, so the coach roster's "Onboarded ✓" can still be tested.)
+        setCompleted((prev) => {
+          const next = new Set(prev).add(step.id);
+          if (ONBOARDING_STEP_KEYS.every((k) => next.has(k))) setCompletedAt(new Date().toISOString());
+          return next;
+        });
+      } else {
+        setCompleted(new Set<string>(data.completed ?? []));
+        setCompletedAt(data.completedAt ?? null);
+      }
       if (currentIdx < total - 1) setCurrentIdx(currentIdx + 1);
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
@@ -77,7 +104,12 @@ export default function OnboardingPage() {
     }
   }, [isComplete, saving, step.id, currentIdx, total]);
 
-  const handleEnter = () => { router.push('/portal/home'); };
+  const handleEnter = () => {
+    // In dev the gate always re-routes to onboarding, so set the session bypass
+    // here too — otherwise finishing the flow would bounce straight back.
+    if (IS_DEV) sessionStorage.setItem('ss-dev-skip', '1');
+    router.push('/portal/home');
+  };
 
   const isLastStep = currentIdx === total - 1;
 
@@ -173,41 +205,50 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {/* Video mock player */}
+          {/* Video — embedded Loom player (shows its own thumbnail + play, plays
+              inline), or a "coming soon" placeholder until Sam supplies the URL. */}
           {step.type === 'video' && (
-            <div
-              className="aspect-video flex flex-col items-center justify-center relative"
-              style={{ background: 'var(--bg2)' }}
-            >
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
-                style={{ background: 'var(--accent)' }}
-                onClick={() => { if (!isComplete) openStep(); }}
-              >
-                <div
-                  className="ml-1"
-                  style={{ width: 0, height: 0, borderTop: '10px solid transparent', borderBottom: '10px solid transparent', borderLeft: '17px solid #fff' }}
+            <div className="aspect-video relative" style={{ background: 'var(--bg2)' }}>
+              {embedUrl ? (
+                <iframe
+                  src={embedUrl}
+                  title={step.title}
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                  style={{ border: 0 }}
                 />
-              </div>
-              {step.placeholder && (
-                <span
-                  className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] font-medium px-2 py-1 rounded text-center"
-                  style={{ background: 'rgba(0,0,0,0.55)', color: 'var(--text2)' }}
-                >
-                  Video coming soon — Sam is adding this
-                </span>
-              )}
-              {step.duration && (
-                <span
-                  className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-[1px] px-2 py-1 rounded"
-                  style={{ background: 'rgba(0,0,0,0.55)', color: 'var(--accent-text)' }}
-                >
-                  {step.duration}
-                </span>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center"
+                    style={{ background: 'var(--accent)', opacity: 0.5 }}
+                  >
+                    <div
+                      className="ml-1"
+                      style={{ width: 0, height: 0, borderTop: '10px solid transparent', borderBottom: '10px solid transparent', borderLeft: '17px solid #fff' }}
+                    />
+                  </div>
+                  {step.placeholder && (
+                    <span
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] font-medium px-2 py-1 rounded text-center"
+                      style={{ background: 'rgba(0,0,0,0.55)', color: 'var(--text2)' }}
+                    >
+                      Video coming soon — Sam is adding this
+                    </span>
+                  )}
+                  {step.duration && (
+                    <span
+                      className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-[1px] px-2 py-1 rounded"
+                      style={{ background: 'rgba(0,0,0,0.55)', color: 'var(--accent-text)' }}
+                    >
+                      {step.duration}
+                    </span>
+                  )}
+                </div>
               )}
               {isComplete && (
                 <span
-                  className="absolute top-3 left-3 text-[10px] font-semibold px-2 py-1 rounded flex items-center gap-1"
+                  className="absolute top-3 left-3 z-10 text-[10px] font-semibold px-2 py-1 rounded flex items-center gap-1"
                   style={{ background: 'var(--accent)', color: '#fff' }}
                 >
                   ✓ Watched
@@ -216,19 +257,31 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Doc / action area */}
+          {/* Doc / action area — a hero image when the step has one, else the icon. */}
           {step.type !== 'video' && (
-            <div
-              className="flex items-center justify-center py-12 px-8"
-              style={{ background: 'var(--bg2)' }}
-            >
-              <div
-                className="w-16 h-16 rounded-[14px] flex items-center justify-center text-3xl"
-                style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)' }}
-              >
-                {step.type === 'doc' ? '📄' : '✅'}
+            step.image ? (
+              <div className="aspect-video relative" style={{ background: 'var(--bg2)' }}>
+                <Image
+                  src={step.image}
+                  alt={step.title}
+                  fill
+                  sizes="(max-width: 760px) 100vw, 760px"
+                  className="object-cover"
+                />
               </div>
-            </div>
+            ) : (
+              <div
+                className="flex items-center justify-center py-12 px-8"
+                style={{ background: 'var(--bg2)' }}
+              >
+                <div
+                  className="w-16 h-16 rounded-[14px] flex items-center justify-center text-3xl"
+                  style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)' }}
+                >
+                  {step.type === 'doc' ? '📄' : '✅'}
+                </div>
+              </div>
+            )
           )}
 
           {/* Info + button */}
@@ -277,7 +330,7 @@ export default function OnboardingPage() {
                 </button>
               )}
 
-              {step.url && !isComplete && isOpened && (
+              {step.url && !isComplete && isOpened && !embedUrl && (
                 <button
                   onClick={openStep}
                   className="text-[12px] transition-colors duration-150"
@@ -353,6 +406,23 @@ export default function OnboardingPage() {
             })}
           </div>
         </div>
+
+        {/* DEV-ONLY bypass — lets you into the portal without walking the flow.
+            Stripped from production builds (NODE_ENV is 'production' there), so a real
+            client never sees it. Sets a session flag the portal gate honours in dev. */}
+        {IS_DEV && (
+          <div className="mt-8 pt-5 flex justify-center" style={{ borderTop: '1px solid var(--border)' }}>
+            <button
+              onClick={handleEnter}
+              className="text-[11px] transition-colors duration-150"
+              style={{ color: 'var(--text3)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text2)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; }}
+            >
+              Bypass onboarding → portal (dev only · never shown to clients)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

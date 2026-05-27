@@ -32,7 +32,20 @@ function getSince() {
   return `Since ${d.toLocaleString('en-GB', { month: 'short' })} ${d.getFullYear()}`;
 }
 
-const GOALS = ['Bulk', 'Fat loss', 'Muscle build', 'Body recomp', 'Maintenance', 'Athletic performance'];
+const GOALS = ['Fat loss', 'Gaining', 'Maintenance'];
+
+// Preset reasons for pausing / cancelling a client (free-text note covers the rest).
+const STATUS_REASONS = [
+  'Stopped paying',
+  'Went solo / self-coaching',
+  'Switched coach',
+  'Lost motivation',
+  'Injury / health',
+  'Holiday / break',
+  'Financial reasons',
+  'Achieved their goal',
+  'Other',
+];
 
 function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const [name, setName]             = useState('');
@@ -92,12 +105,12 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in"
       style={{ background: 'rgba(0,0,0,0.45)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-[520px] rounded-[16px] overflow-hidden"
+        className="w-full max-w-[520px] rounded-[16px] overflow-hidden animate-scale-in"
         style={{ background: 'var(--surface)', border: '1px solid var(--border2)', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}
       >
         {/* Header */}
@@ -205,7 +218,8 @@ export default function ClientRosterPage() {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openNotes, setOpenNotes] = useState<string | null>(null);
-  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string }>>({});
+  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string }>>({});
+  const [customPhase, setCustomPhase] = useState<Record<string, boolean>>({});
   const [saved, setSaved]         = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [deleting, setDeleting]   = useState<string | null>(null);
@@ -236,6 +250,9 @@ export default function ClientRosterPage() {
       paymentDate: c.nextPaymentDate ?? '',
       goal: c.goal === '—' ? '' : c.goal,
       programStart: c.programStart ?? '',
+      status: c.status,
+      statusReason: c.statusReason ?? '',
+      statusNote: c.statusNote ?? '',
     };
 
   const toggleNotes = (id: string) => setOpenNotes(openNotes === id ? null : id);
@@ -243,6 +260,9 @@ export default function ClientRosterPage() {
   const saveNote = async (c: Client) => {
     const d = getDraft(c);
     const goal = d.goal.trim();
+    // Reason only applies when paused/cancelled — clear it when back to Active.
+    const statusReason = d.status === 'Active' ? null : (d.statusReason || null);
+    const statusNote   = d.status === 'Active' ? null : (d.statusNote.trim() || null);
     const res = await fetch('/api/clients', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -252,6 +272,9 @@ export default function ClientRosterPage() {
         next_payment_date: d.paymentDate || null,
         goal: goal || null,
         program_start: d.programStart || null,
+        status: d.status,
+        status_reason: statusReason,
+        status_note: statusNote,
       }),
     });
     if (res.ok) {
@@ -264,6 +287,9 @@ export default function ClientRosterPage() {
               payment: calcPaymentStatus(d.paymentDate || undefined),
               goal: goal || '—',
               programStart: d.programStart || undefined,
+              status: d.status,
+              statusReason: statusReason ?? undefined,
+              statusNote: statusNote ?? undefined,
             }
           : x
       ));
@@ -286,8 +312,9 @@ export default function ClientRosterPage() {
     setDeleting(null);
   };
 
-  const active = roster.filter(c => c.status === 'Active').length;
-  const paused = roster.filter(c => c.status === 'Paused').length;
+  const active    = roster.filter(c => c.status === 'Active').length;
+  const paused    = roster.filter(c => c.status === 'Paused').length;
+  const cancelled = roster.filter(c => c.status === 'Cancelled').length;
 
   return (
     <>
@@ -308,13 +335,14 @@ export default function ClientRosterPage() {
           </button>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
-          All active and paused clients. Click a row to edit their phase, program start, notes, or payment — or remove the client.
+          All your clients — active, paused and cancelled. Click a row to edit their phase, program start, status, notes, or payment — or remove the client.
         </p>
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-3 mb-6">
           <StatCard label="Total clients" value={String(roster.length)} valueColor="var(--accent-text)" />
-          <StatCard label="Paused"        value={String(paused)} />
           <StatCard label="Active"        value={String(active)} valueColor="var(--accent-text)" />
+          <StatCard label="Paused"        value={String(paused)} />
+          <StatCard label="Cancelled"     value={String(cancelled)} valueColor={cancelled > 0 ? 'var(--red)' : undefined} />
         </div>
 
         {loadError && (
@@ -375,6 +403,7 @@ export default function ClientRosterPage() {
               </div>
 
               {openNotes === c.id && (
+                <div className="animate-accordion">
                 <div
                   className="px-5 pb-4"
                   style={{ borderBottom: i < roster.length - 1 ? '1px solid var(--border)' : 'none' }}
@@ -409,6 +438,51 @@ export default function ClientRosterPage() {
                       </span>
                     </div>
 
+                    {/* Client status + reason (full width) */}
+                    <div className="col-span-2">
+                      <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>
+                        Client status
+                      </h3>
+                      <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
+                        Active = coaching now. Paused = temporarily on hold. Cancelled = no longer a client (left the community / stopped paying).
+                      </p>
+                      <div className="grid grid-cols-2 gap-6">
+                        <select
+                          value={getDraft(c).status}
+                          onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), status: e.target.value as ClientStatus } }))}
+                          className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150"
+                          style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Paused">Paused</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                        {getDraft(c).status !== 'Active' && (
+                          <select
+                            value={getDraft(c).statusReason}
+                            onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), statusReason: e.target.value } }))}
+                            className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150"
+                            style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                          >
+                            <option value="">— Reason {getDraft(c).status === 'Paused' ? 'paused' : 'cancelled'} —</option>
+                            {STATUS_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        )}
+                      </div>
+                      {getDraft(c).status !== 'Active' && (
+                        <textarea
+                          value={getDraft(c).statusNote}
+                          onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), statusNote: e.target.value } }))}
+                          rows={2}
+                          placeholder="Optional note — more detail on why (only you can see this)."
+                          className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none resize-y leading-[1.7] transition-colors duration-150 mt-3"
+                          style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                          onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'var(--accent)'; }}
+                          onBlur={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'var(--border2)'; }}
+                        />
+                      )}
+                    </div>
+
                     {/* Phase (goal) — shows in the client's top-bar */}
                     <div>
                       <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>
@@ -417,19 +491,43 @@ export default function ClientRosterPage() {
                       <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
                         Shows in their portal top-bar as &ldquo;{getDraft(c).goal || 'Phase'} · Week {weekFromStart(getDraft(c).programStart) ?? 'N'}&rdquo;.
                       </p>
-                      <input
-                        list="phase-options"
-                        value={getDraft(c).goal}
-                        onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), goal: e.target.value } }))}
-                        placeholder="e.g. Bulk"
-                        className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150"
-                        style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
-                        onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
-                        onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
-                      />
-                      <datalist id="phase-options">
-                        {GOALS.map(g => <option key={g} value={g} />)}
-                      </datalist>
+                      {(() => {
+                        const dg = getDraft(c).goal;
+                        const isCustom = customPhase[c.id] ?? (!!dg && !GOALS.includes(dg));
+                        return (
+                          <>
+                            <select
+                              value={isCustom ? '__custom__' : dg}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === '__custom__') {
+                                  setCustomPhase(p => ({ ...p, [c.id]: true }));
+                                } else {
+                                  setCustomPhase(p => ({ ...p, [c.id]: false }));
+                                  setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), goal: v } }));
+                                }
+                              }}
+                              className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150"
+                              style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                            >
+                              <option value="">— Select phase —</option>
+                              {GOALS.map(g => <option key={g} value={g}>{g}</option>)}
+                              <option value="__custom__">Other (custom)…</option>
+                            </select>
+                            {isCustom && (
+                              <input
+                                value={dg}
+                                onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), goal: e.target.value } }))}
+                                placeholder="Custom phase name"
+                                className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150 mt-2"
+                                style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                                onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+                                onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
+                              />
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Program start — drives the auto-incrementing week */}
@@ -522,6 +620,7 @@ export default function ClientRosterPage() {
                       </button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
             </div>

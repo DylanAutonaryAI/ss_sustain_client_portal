@@ -3,7 +3,23 @@
 import { useState } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
+import AnimatedStat, { useCountUp } from '@/components/ui/CountUp';
 import { useAnalytics } from '@/lib/analytics';
+
+// One section row: the bar fills and the % counts up to its value on mount, and
+// re-animates when you toggle All-time / Last 30 days.
+function SectionBar({ label, pct }: { label: string; pct: number }) {
+  const v = useCountUp(pct, 700);
+  return (
+    <div className="flex items-center gap-2.5 mb-2.5">
+      <span className="text-[12px] w-[110px] flex-shrink-0" style={{ color: 'var(--text2)' }}>{label}</span>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg3)' }}>
+        <div className="h-full rounded-full" style={{ width: `${v}%`, background: 'var(--accent)' }} />
+      </div>
+      <span className="text-[12px] font-medium w-8 text-right" style={{ color: 'var(--text)' }}>{Math.round(v)}%</span>
+    </div>
+  );
+}
 
 export default function AnalyticsPage() {
   const { data, loading, error } = useAnalytics();
@@ -118,21 +134,9 @@ export default function AnalyticsPage() {
                 : 'Share of logged-in clients who’ve ever opened each section.'}
             </p>
 
-            {a && !noSectionData && sortedSections.map((s) => {
-              const pct = recent ? s.pct30 : s.pct;
-              return (
-                <div key={s.key} className="flex items-center gap-2.5 mb-2.5">
-                  <span className="text-[12px] w-[110px] flex-shrink-0" style={{ color: 'var(--text2)' }}>{s.label}</span>
-                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg3)' }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%`, background: 'var(--accent)' }}
-                    />
-                  </div>
-                  <span className="text-[12px] font-medium w-8 text-right" style={{ color: 'var(--text)' }}>{pct}%</span>
-                </div>
-              );
-            })}
+            {a && !noSectionData && sortedSections.map((s) => (
+              <SectionBar key={s.key} label={s.label} pct={recent ? s.pct30 : s.pct} />
+            ))}
 
             {loading && (
               <div className="py-6 text-center text-[12px]" style={{ color: 'var(--text3)' }}>Loading…</div>
@@ -174,7 +178,7 @@ export default function AnalyticsPage() {
                       'var(--text)',
                   }}
                 >
-                  {m.value}
+                  <AnimatedStat text={m.value} />
                 </span>
               </div>
             ))}

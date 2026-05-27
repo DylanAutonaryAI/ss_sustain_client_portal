@@ -1,15 +1,16 @@
 import type { ClientStatus } from '@/lib/types';
 
 export function StatusPill({ status }: { status: ClientStatus }) {
-  const isActive = status === 'Active';
+  const palette =
+    status === 'Active'
+      ? { background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent-text)' }
+      : status === 'Paused'
+        ? { background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--amber)' }
+        : { background: 'rgba(240,79,79,0.1)', border: '1px solid rgba(240,79,79,0.2)', color: 'var(--red)' };
   return (
     <span
       className="inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[10px] font-semibold uppercase tracking-[0.5px]"
-      style={
-        isActive
-          ? { background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent-text)' }
-          : { background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--amber)' }
-      }
+      style={palette}
     >
       <span
         className="w-1 h-1 rounded-full"

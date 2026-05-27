@@ -12,6 +12,8 @@ export interface ClientRow {
   email: string | null;
   goal: string | null;
   status: string | null;
+  status_reason: string | null;
+  status_note: string | null;
   next_payment_date: string | null;
   program_start: string | null;
   notes: string | null;
@@ -108,6 +110,8 @@ export function mapRow(row: ClientRow): Client {
     notes: row.notes || '',
     nextPaymentDate: row.next_payment_date ?? undefined,
     programStart: row.program_start ?? undefined,
+    statusReason: row.status_reason ?? undefined,
+    statusNote: row.status_note ?? undefined,
     avatarUrl: row.avatar_url ?? undefined,
     nickname: row.nickname?.trim() || undefined,
     birthday: row.birthday ?? undefined,

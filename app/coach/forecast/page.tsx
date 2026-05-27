@@ -2,6 +2,7 @@
 
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
+import AnimatedStat from '@/components/ui/CountUp';
 import { useClientRoster } from '@/lib/clients';
 import { usePayments, computeMrr, formatGBP } from '@/lib/payments';
 
@@ -64,7 +65,7 @@ export default function ForecastPage() {
                   {m.label}
                 </div>
                 <div className="font-serif text-[24px] leading-none mb-1" style={{ color: 'var(--accent-text)' }}>
-                  {formatGBP(m.mrr)}
+                  <AnimatedStat text={formatGBP(m.mrr)} />
                 </div>
                 <div className="text-[11px]" style={{ color: 'var(--text3)' }}>{m.clients} client{m.clients !== 1 ? 's' : ''}</div>
               </div>

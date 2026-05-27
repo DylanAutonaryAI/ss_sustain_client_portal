@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try { await supabase.auth.signOut(); } catch { /* ignore — navigate anyway */ }
     localStorage.removeItem('ss-user');
     localStorage.removeItem('ss-onboarding-done');
+    sessionStorage.removeItem('ss-dev-skip'); // dev bypass — so every fresh login re-shows onboarding
     window.location.href = '/login';
   };
 

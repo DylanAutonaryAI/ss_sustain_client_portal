@@ -41,9 +41,8 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   - `app/portal/layout.tsx` — gate now reads the DB, not the browser.
   - `app/coach/clients/page.tsx` — roster shows onboarding status (Not started /
     N of M / Onboarded ✓ + date). Sam's in-portal proof.
-- **⚠️ GATE 1 — run `db/2026-05-27_onboarding_progress.sql` in Supabase.** Until then
-  the onboarding API errors (table/column missing). Optional grandfather block inside
-  marks current clients onboarded so the DB gate doesn't bounce them.
+- **GATE 1 — `db/2026-05-27_onboarding_progress.sql` applied ✅** (verified by query;
+  table + `onboarding_completed_at` column live). Onboarding gate is enforced in prod.
 - **DECISION (2026-05-27): portal onboarding COMPLEMENTS Sam's Brevo flow, doesn't
   replace it.** Sam's real onboarding runs outside the portal — Jotform application →
   Calendly call → **Brevo 2-day** flow (Day 1 info sheet + 1fit/Sheets/Notion invites;
@@ -63,11 +62,42 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   Loom URLs. Those are the only content blockers left; the rest of the gate is live.
 - **Deferred:** email to Sam on completion (decided in-portal-only for now — roster badge
   is the proof); hook stubbed in the POST route, needs `RESEND_API_KEY` + Sam's address.
-- **Referral scheme terms captured** (separate feature, not onboarding): £100/referral,
-  paid after 3 months if they sign up monthly, paid immediately if they join upfront on
-  a 3/6/12-month plan. Feeds the still-to-build referral page + leaderboard.
+- **Referral scheme — BUILT & LIVE** (see Recently done). £100/referral, paid after 3 months
+  for monthly signups, immediately for upfront 3/6/12-month plans; new client gets nothing.
+  Tracking-only (no Stripe automation). SQL applied ✅; coach can convert/pay/delete leads,
+  clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-27 (later) — Referral polish + platform additions (this push).**
+  - Referral: coach can **delete** a lead (✕ → confirm) and the leaderboard / earned /
+    pending / totals all recompute from `referral_leads`; **client-facing team leaderboard**
+    on Refer a Friend (first name + last initial, **counts only, no £**, your row highlighted,
+    top 10, folded into the one `/api/referral/me` fetch); fixed a StrictMode code-gen race
+    that displayed a different code than was stored ("referral link no longer valid").
+  - **All four migrations verified applied in Supabase** (by direct query): `referral`,
+    `onboarding_progress`, `page_views`, and `last_login`. The chart/gate/scheme are live.
+  - Bundled in from the parallel (onboarding) session: **notification badges**
+    (`lib/notifications.ts` + sidebar unseen-counts, coach & client), **UI animation polish**
+    (`CountUp`, `Donut`, route `template.tsx` transitions, animated analytics bars), and a
+    new **`db/2026-05-27_client_status_reason.sql`** (pause-reason on clients) — **see Watch out**.
+- **2026-05-27 — Referral scheme built (tracking + £100 payout reminders).**
+  - **Decisions (Dylan):** Sam manually marks a lead "joined" + picks the plan;
+    referrer sees their earned/pending £100; new client gets nothing (v1).
+  - **The portal never touches Stripe/money** — it tracks who's owed £100 and when,
+    and Sam ticks "paid" after his bank transfer. Sidesteps the Stripe-automation rabbit hole.
+  - `db/2026-05-27_referral.sql` — `clients.referral_code` (unique) + `referral_leads`
+    extended with `status`/`plan_type`/`joined_at`/`payout_due_at`/`payout_paid_at`. RLS
+    locked (all access via service-role routes). **⚠️ RUN THIS IN SUPABASE** — until then
+    the referral page can't generate a code and leads can't be stored.
+  - `lib/referral.ts` — `REFERRAL_REWARD_GBP=100`, `computePayoutDue` (upfront→now,
+    monthly→+3mo), `payoutState` (none/pending/due/paid). Single source of truth.
+  - `app/api/referral/manage` (coach) — list leads + `convert` (pick plan) + `pay`/`unpay`.
+    `…/me` now returns earned/pending totals; `…/leaderboard` ranks by **conversions**.
+  - Coach **Referrals** page (`/coach/leaderboard`, nav relabelled) — stat cards (joined,
+    owed now, upcoming, paid), a Leads & payouts table (Mark joined → Upfront/Monthly;
+    Pay £100; undo), and the leaderboard. Client **Refer a Friend** page shows earned/pending.
+  - **Still manual:** Sam decides when someone "joined" (no Stripe webhook). Fine for now;
+    automate the convert step later if/when Stripe lands.
 - **2026-05-27 — Analytics page real + view tracking + critical client-auth fix.**
   - **Analytics page real** — `app/coach/analytics/page.tsx` reads `GET /api/analytics`
     (coach-only, service-role, scoped to `coach_id`): login-activity buckets (active
@@ -124,23 +154,26 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   logout/AuthProvider hardening.
 
 ## ⏭️ Still to do
-- **Leaderboard (coach) + Referral page (client)** — need a referral-tracking system built.
-- **Onboarding go-live** — run the SQL (Gate 1), slot in Sam's content (Gate 2),
-  then optionally wire the completion email to Sam.
-- **Confirm the `last_login` SQL was actually run in Supabase.**
+- **Social / meal tracker — the next big feature** (per CLAUDE.md, Sam-requested, top
+  engagement priority). Per-client logging Sam can click into to see if they logged.
+  **Blocked on Sam sending his current tracker** so we know what it captures.
+- **Onboarding go-live** — only Gate 2 left: Sam's **welcome video** + **portal walkthrough**
+  Loom URLs (the SQL is applied). Then optionally wire the completion email to Sam.
+- **Resend domain verification** — until done, invite emails only reach the Resend account
+  owner, so a real client can't be onboarded end-to-end. Dashboard task, not code.
 - Optional: split a longer-term **goal** from the **phase** if Sam wants both —
   the top-bar currently uses the `goal` field as the phase.
 
 ## ⚠️ Watch out
-- **Run `db/2026-05-27_onboarding_progress.sql`** — the onboarding flow won't work
-  until this is applied in Supabase (the portal gate now reads the DB, not localStorage).
-- **`db/2026-05-27_page_views.sql` — applied ✅** (analytics sections chart is live).
-  If the Vercel project ever points at a *different* Supabase than local `.env.local`,
-  re-run it there too.
-- **Referral feature still needs doing** (leaderboard + client referral page depend on it).
+- **Applied ✅ (verified by query):** `db/2026-05-27_onboarding_progress.sql`,
+  `db/2026-05-27_page_views.sql`, `db/2026-05-27_referral.sql`, and `last_login`.
+  If Vercel ever points at a *different* Supabase than local `.env.local`, re-run them there.
+- **`db/2026-05-27_client_status_reason.sql` — NOT yet verified.** New migration from the
+  onboarding session (pause-reason on clients). Run it / confirm it's applied, or that
+  feature will error on the missing column.
 - Invite emails: Resend sandbox sender only reaches the Resend account owner until a
   domain is verified in Resend + the Supabase SMTP "from" is updated.
 
 ---
 
-**Last updated:** 2026-05-27 — analytics + client-auth-fix session (computer)
+**Last updated:** 2026-05-27 — referral scheme + polish session (computer)

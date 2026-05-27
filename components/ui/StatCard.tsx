@@ -1,3 +1,5 @@
+import AnimatedStat from '@/components/ui/CountUp';
+
 interface StatCardProps {
   label: string;
   value: string | number;
@@ -28,7 +30,7 @@ export default function StatCard({ label, value, change, changeType = 'neutral',
         className="font-serif text-[30px] tracking-[-0.5px] leading-none mb-[5px]"
         style={{ color: valueColor ?? 'var(--text)' }}
       >
-        {value}
+        <AnimatedStat text={String(value)} />
       </div>
       {change && (
         <div className="text-[12px]" style={{ color: changeColor }}>
