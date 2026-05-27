@@ -1,13 +1,16 @@
 import { createBrowserClient } from '@supabase/ssr';
-import { processLock } from '@supabase/supabase-js';
 
-// One shared browser client for the whole app. Previously every createClient()
-// call made a NEW client (AuthProvider, login page, layout RPCs, …). All of them
-// share the same `navigator.locks` auth lock, and under React StrictMode's
-// double-mount they deadlocked it — getSession()/RPCs would hang forever, so
-// `user` stayed null (broken name, avatar, greeting and sign-out). Reusing one
-// instance, plus the in-memory processLock instead of navigator.locks, removes
-// the deadlock.
+// No-op auth lock: run every auth operation immediately without acquiring any
+// cross-call lock. BOTH the default navigator.locks AND processLock deadlocked
+// here — getSession() / get_my_role would grab the lock, hang, and never release,
+// so loadProfile never finished and the profile stayed empty ("Hello there").
+// With no lock there is nothing to deadlock on. The token is fresh right after
+// login so there's no refresh to race, and this is a single-session browser app.
+const noLock = <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn();
+
+// One shared browser client for the whole app — reused across AuthProvider, the
+// login page, layout RPCs, etc. (creating a new client per call multiplied the
+// lock contention).
 function makeClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,8 +22,7 @@ function makeClient() {
         // client from racing to consume the same one-time code.
         detectSessionInUrl: false,
         flowType: 'pkce',
-        // In-memory lock — never deadlocks the way navigator.locks did.
-        lock: processLock,
+        lock: noLock,
       },
     },
   );
