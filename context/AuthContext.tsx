@@ -43,24 +43,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Load initial session — swallow errors so a stale/invalid session never
     // surfaces as an unhandled rejection (which freezes the dev error overlay).
+    console.log('[auth-debug] getSession() called');
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
+        console.log('[auth-debug] getSession resolved | hasSession =', !!session, '| email =', session?.user?.email);
         if (session?.user) await loadProfile(session.user);
       })
-      .catch(() => { setUser(null); setSupabaseUser(null); });
+      .catch((e) => { console.log('[auth-debug] getSession ERROR', e); setUser(null); setSupabaseUser(null); });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Listen for auth changes. Only clear the user on an explicit SIGNED_OUT —
+    // a transient event without a session must NOT wipe a logged-in profile.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[auth-debug] onAuthStateChange', event, '| hasSession =', !!session);
       try {
         if (session?.user) {
           await loadProfile(session.user);
-        } else {
+        } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setSupabaseUser(null);
         }
-      } catch {
-        setUser(null);
-        setSupabaseUser(null);
+      } catch (e) {
+        console.log('[auth-debug] onAuthStateChange threw', e);
       }
     });
 
@@ -68,14 +71,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function loadProfile(sbUser: User) {
+    console.log('[auth-debug] loadProfile start for', sbUser.email);
     setSupabaseUser(sbUser);
     try {
-      const { data: role } = await supabase.rpc('get_my_role');
-      const { data: profile } = await supabase
+      const { data: role, error: roleErr } = await supabase.rpc('get_my_role');
+      console.log('[auth-debug] get_my_role →', role, '| err =', roleErr?.message ?? null);
+      const { data: profile, error: profErr } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', sbUser.id)
         .single();
+      console.log('[auth-debug] profiles →', profile, '| err =', profErr?.message ?? null);
 
       const name = profile?.full_name || sbUser.email?.split('@')[0] || 'User';
       setUser({
@@ -85,8 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         avatarUrl: profile?.avatar_url || undefined,
         nickname: profile?.nickname || undefined,
       });
-    } catch {
+      console.log('[auth-debug] setUser done → name =', name);
+    } catch (e) {
       // Session is present but unusable (e.g. revoked) — treat as logged out.
+      console.log('[auth-debug] loadProfile THREW →', e);
       setUser(null);
       setSupabaseUser(null);
     }
