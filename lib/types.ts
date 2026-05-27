@@ -68,10 +68,14 @@ export interface Client {
   referrals: number;
   notes: string;
   nextPaymentDate?: string; // YYYY-MM-DD — drives auto Paid/Due/Overdue
+  programStart?: string; // YYYY-MM-DD — start of current phase; drives the portal week count
   // Synced from the client's own profile (profiles table) when they have a login
   avatarUrl?: string;
   nickname?: string;
   birthday?: string; // YYYY-MM-DD
+  // Onboarding progress (from onboarding_progress + clients.onboarding_completed_at)
+  onboardingCompletedAt?: string; // ISO timestamp; set = fully onboarded
+  onboardingStepsDone?: number;   // count of steps finished so far
 }
 
 export interface RevenueRow {
@@ -134,13 +138,14 @@ export interface PosingTip {
 export type OnboardingStepType = 'video' | 'doc' | 'action';
 
 export interface OnboardingStep {
-  id: string;
+  id: string; // stable key — referenced by onboarding_progress rows; never rename
   type: OnboardingStepType;
   title: string;
   description: string;
   duration?: string;
   actionLabel?: string;
   url?: string;
+  placeholder?: boolean; // true = still needs Sam's real video/link/PDF
 }
 
 export type EventType = 'live-call' | 'q-and-a' | 'workshop' | 'challenge' | 'social';

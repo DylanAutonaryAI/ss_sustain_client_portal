@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { useContent } from '@/context/ContentContext';
-import type { Supplement, MindsetTip, GymBagItem, ShoppingItem, ShoppingCategory, NonNegotiable, Webinar, VideoClip, PdfResource, PosingVideo, PosingTip } from '@/lib/types';
+import type { Supplement, MindsetTip, GymBagItem, ShoppingCategory, NonNegotiable, Webinar, VideoClip, PdfResource, PosingVideo, PosingTip } from '@/lib/types';
 
 type Tab = 'supplements' | 'mindset' | 'webinars' | 'training' | 'posingvids' | 'posingtips' | 'library' | 'gymbag' | 'shopping' | 'nonneg';
 

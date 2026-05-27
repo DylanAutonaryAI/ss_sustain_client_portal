@@ -1,6 +1,6 @@
 'use client';
 
-import Topbar from '@/components/layout/Topbar';
+import PortalTopbar from '@/components/layout/PortalTopbar';
 import SupplementRow from '@/components/ui/SupplementRow';
 import { useContent } from '@/context/ContentContext';
 
@@ -11,7 +11,7 @@ export default function SupplementsPage() {
 
   return (
     <>
-      <Topbar title="Supplements" statusLabel="Bulk · Week 8" />
+      <PortalTopbar title="Supplements" />
       <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Supplement <em className="italic" style={{ color: 'var(--accent-text)' }}>Guide</em>

@@ -1,6 +1,6 @@
 'use client';
 
-import Topbar from '@/components/layout/Topbar';
+import PortalTopbar from '@/components/layout/PortalTopbar';
 import { useContent } from '@/context/ContentContext';
 
 function extractYouTubeId(input: string): string {
@@ -15,7 +15,7 @@ export default function PosingPage() {
 
   return (
     <>
-      <Topbar title="Posing Area" statusLabel="Bulk · Week 8" />
+      <PortalTopbar title="Posing Area" />
       <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Posing <em className="italic" style={{ color: 'var(--accent-text)' }}>Area</em>

@@ -15,28 +15,81 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-26)
-Snapshot of the whole project state below. The build is well underway — auth and
-most coach/client features are wired to Supabase and pushed to GitHub. The one
-thing left mid-flight is the client top-bar (`Bulk · Week 8`), stopped on a design
-decision (see Active). Workflow reminder: `git pull` at start → work in ONE place →
-"update the handoff and push" at end. (Cross-machine setup is documented in `CLAUDE.md`.)
+## 📌 Latest handoff note (2026-05-27)
+Two workstreams landed and were pushed together: (1) the **client onboarding flow made
+real** (engine + coach visibility; still gated on SQL + Sam's content — see Active), and
+(2) the **coach Analytics page made real + portal view tracking**, which also surfaced
+and fixed a **critical client-login auth deadlock** and the portal onboarding-gate
+infinite-"Loading" loop (see Recently done). Verified deploy-safe (tsc + lint clean) and
+pushed to `master`. Workflow reminder: `git pull` at start → work in ONE place → "update
+the handoff and push" at end. (Cross-machine setup is in `CLAUDE.md`.)
+NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally first.
 
 ---
 
 ## 🔴 Active — in progress right now
-**Client top-bar `Bulk · Week 8` → make it real (stopped mid-decision).**
-- Currently hardcoded as `statusLabel="Bulk · Week 8"` across the 9 portal pages
-  under `app/portal/` (home, community, library, mindset, posing, recommendations,
-  supplements, training, webinars).
-- Plan: `goal = phase` (make editable in the coach roster); `week` = auto-count
-  from join date OR a Sam-set start date.
-- Blocker/need: a way for a **client to read their own record** (their goal/phase +
-  start date) so the top-bar can render real per-client values.
-- **Decision still open** (auto-from-join-date vs Sam-set start date). **Not started
-  in code.**
+**Onboarding flow → made real. Engine built; going-live is gated on 2 things.**
+- Was a front-end shell (localStorage only, no coach visibility, skippable,
+  duplicate-id bug). Now Supabase-backed:
+  - `db/2026-05-27_onboarding_progress.sql` — new `onboarding_progress` table +
+    `clients.onboarding_completed_at`.
+  - `lib/onboarding.ts` — canonical steps, stable keys (replaces the deleted
+    `lib/mock-data/onboarding.ts`); steps needing real content flagged `placeholder`.
+  - `app/api/onboarding/me/route.ts` — GET progress / POST mark-step + stamp completion.
+  - `app/onboarding/page.tsx` — wired to the API; sequential open-then-confirm;
+    resumes cross-device; **admin-skip removed**.
+  - `app/portal/layout.tsx` — gate now reads the DB, not the browser.
+  - `app/coach/clients/page.tsx` — roster shows onboarding status (Not started /
+    N of M / Onboarded ✓ + date). Sam's in-portal proof.
+- **⚠️ GATE 1 — run `db/2026-05-27_onboarding_progress.sql` in Supabase.** Until then
+  the onboarding API errors (table/column missing). Optional grandfather block inside
+  marks current clients onboarded so the DB gate doesn't bounce them.
+- **GATE 2 — content from Sam:** real videos, intake-form Google Doc link, Sheets-invite
+  process, welcome-pack final PDF, how agreement signing works, WhatsApp invite link,
+  confirmed concise step list.
+- **Deferred:** email to Sam on completion (decided in-portal-only for now); hook is
+  stubbed in the POST route — needs `RESEND_API_KEY` + Sam's address to switch on.
 
 ## ✅ Recently done
+- **2026-05-27 — Analytics page real + view tracking + critical client-auth fix.**
+  - **Analytics page real** — `app/coach/analytics/page.tsx` reads `GET /api/analytics`
+    (coach-only, service-role, scoped to `coach_id`): login-activity buckets (active
+    today / 7d / 30d, inactive 14+, never logged in, activation rate), referral leads +
+    top referrer, community engagement, and a real **"most visited sections"** chart
+    with an **All-time / Last-30-days toggle** (30-day = the engagement/churn signal;
+    both use the same denominator, so the gap between them = staleness). Dropped the
+    dead mock metrics (message-read, landing-conv).
+  - **View tracking** — `page_views` table + `record_page_view(section)` rpc (mirrors
+    `touch_last_login`). `app/portal/layout.tsx` records each section once per browser
+    session via `usePathname()` — one edit, not 9 pages. Records on SUCCESS (key prefix
+    `ss-pv-`), so a failed/blocked call retries instead of getting permanently stuck.
+    `db/2026-05-27_page_views.sql` — **applied in Supabase ✅ (verified by query).**
+  - **🛠 Fixed a deadlock that broke EVERY client login** (`lib/supabase/client.ts`):
+    each `createClient()` made a NEW browser client; under React StrictMode they
+    deadlocked the shared `navigator.locks` auth lock → `getSession()`/RPCs hung →
+    `user` stayed null (no name/avatar/greeting, sign-out did nothing). Fix: one shared
+    browser client + in-memory `processLock`. **This hit real clients, not just our
+    debugging.**
+  - **Fixed the portal onboarding gate trapping clients on "Loading…"**
+    (`app/portal/layout.tsx`): removed the stale `ss-user` localStorage redirect loop;
+    the gate now runs once on mount and fails open, so a transient error can't trap it.
+    (Note: this touched the onboarding session's file — kept their DB gate intact.)
+  - Greened the build: removed two pre-existing unused-symbol lint errors
+    (`app/coach/content/page.tsx` `ShoppingItem`, `app/onboarding/page.tsx` `canEnter`).
+    No `eslint.ignoreDuringBuilds`, so these were breaking the Vercel build on push.
+- **2026-05-27 (computer) — Client top-bar `<phase> · Week N` is now real & per-client.**
+  - Decision taken: Sam sets a **program start date** per client and the week
+    **auto-ticks** from it (Week 1 = first week, +1 every 7 days); **phase = the
+    existing `goal`** field, now editable in the roster.
+  - DB: added `program_start date` to `clients` — `db/2026-05-27_client_program_start.sql`
+    (RUN in Supabase ✅, with the created_at backfill).
+  - New `GET /api/clients/me` lets a logged-in client read their own row (admin-scoped
+    to `user_id`) — this was the blocker.
+  - New `lib/my-client.ts` (`weekFromStart` / `phaseWeekLabel` / cached `useMyPhaseWeek`)
+    and `components/layout/PortalTopbar.tsx` centralise the label — it was hardcoded
+    on all 9 portal pages, now defined once.
+  - Roster (`app/coach/clients/page.tsx`) now edits phase + program start (live
+    "Currently: Week N" readout); changes flow to the client's top-bar.
 - **Auth:** login, invite-accept + set password, sign out.
 - **Client roster → Supabase** (overview "recent clients" too).
 - **Content** (all 11 types) → Supabase; coach edits reach clients.
@@ -54,16 +107,23 @@ decision (see Active). Workflow reminder: `git pull` at start → work in ONE pl
   logout/AuthProvider hardening.
 
 ## ⏭️ Still to do
-- **Analytics page (coach)** — still mock.
 - **Leaderboard (coach) + Referral page (client)** — need a referral-tracking system built.
-- **Onboarding page (client)** — not checked yet.
+- **Onboarding go-live** — run the SQL (Gate 1), slot in Sam's content (Gate 2),
+  then optionally wire the completion email to Sam.
 - **Confirm the `last_login` SQL was actually run in Supabase.**
+- Optional: split a longer-term **goal** from the **phase** if Sam wants both —
+  the top-bar currently uses the `goal` field as the phase.
 
 ## ⚠️ Watch out
+- **Run `db/2026-05-27_onboarding_progress.sql`** — the onboarding flow won't work
+  until this is applied in Supabase (the portal gate now reads the DB, not localStorage).
+- **`db/2026-05-27_page_views.sql` — applied ✅** (analytics sections chart is live).
+  If the Vercel project ever points at a *different* Supabase than local `.env.local`,
+  re-run it there too.
 - **Referral feature still needs doing** (leaderboard + client referral page depend on it).
 - Invite emails: Resend sandbox sender only reaches the Resend account owner until a
   domain is verified in Resend + the Supabase SMTP "from" is updated.
 
 ---
 
-**Last updated:** 2026-05-26 — laptop
+**Last updated:** 2026-05-27 — analytics + client-auth-fix session (computer)

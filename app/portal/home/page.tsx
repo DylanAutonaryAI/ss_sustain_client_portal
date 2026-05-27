@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Topbar from '@/components/layout/Topbar';
+import PortalTopbar from '@/components/layout/PortalTopbar';
 import AnnounceStrip from '@/components/ui/AnnounceStrip';
 import ResourceRow from '@/components/ui/ResourceRow';
 
@@ -107,7 +107,7 @@ export default function HomePage() {
 
   return (
     <>
-      <Topbar title="Home" statusLabel="Bulk · Week 8" />
+      <PortalTopbar title="Home" />
       <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Good morning, <em className="italic" style={{ color: 'var(--accent-text)' }}>{firstName}.</em>

@@ -1,6 +1,6 @@
 'use client';
 
-import Topbar from '@/components/layout/Topbar';
+import PortalTopbar from '@/components/layout/PortalTopbar';
 import PdfRow from '@/components/ui/PdfRow';
 import { useContent } from '@/context/ContentContext';
 
@@ -9,7 +9,7 @@ export default function LibraryPage() {
 
   return (
     <>
-      <Topbar title="Resource Library" statusLabel="Bulk · Week 8" />
+      <PortalTopbar title="Resource Library" />
       <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Resource <em className="italic" style={{ color: 'var(--accent-text)' }}>Library</em>

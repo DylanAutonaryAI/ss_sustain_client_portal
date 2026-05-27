@@ -13,6 +13,7 @@ export interface ClientRow {
   goal: string | null;
   status: string | null;
   next_payment_date: string | null;
+  program_start: string | null;
   notes: string | null;
   since: string | null;
   created_at: string | null;
@@ -21,6 +22,9 @@ export interface ClientRow {
   avatar_url?: string | null;
   nickname?: string | null;
   birthday?: string | null;
+  // Onboarding (joined server-side in /api/clients)
+  onboarding_completed_at?: string | null;
+  onboarding_steps_done?: number | null;
 }
 
 export function getInitials(name: string) {
@@ -103,9 +107,12 @@ export function mapRow(row: ClientRow): Client {
     referrals: 0,
     notes: row.notes || '',
     nextPaymentDate: row.next_payment_date ?? undefined,
+    programStart: row.program_start ?? undefined,
     avatarUrl: row.avatar_url ?? undefined,
     nickname: row.nickname?.trim() || undefined,
     birthday: row.birthday ?? undefined,
+    onboardingCompletedAt: row.onboarding_completed_at ?? undefined,
+    onboardingStepsDone: row.onboarding_steps_done ?? 0,
   };
 }
 

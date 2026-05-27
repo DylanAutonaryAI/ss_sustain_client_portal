@@ -1,6 +1,6 @@
 'use client';
 
-import Topbar from '@/components/layout/Topbar';
+import PortalTopbar from '@/components/layout/PortalTopbar';
 import { useContent } from '@/context/ContentContext';
 import type { ShoppingCategory } from '@/lib/types';
 
@@ -22,7 +22,7 @@ export default function RecommendationsPage() {
 
   return (
     <>
-      <Topbar title="Recommendations" statusLabel="Bulk · Week 8" />
+      <PortalTopbar title="Recommendations" />
       <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Coach <em className="italic" style={{ color: 'var(--accent-text)' }}>Recommendations</em>

@@ -16,16 +16,31 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Enrich with each client's own profile data (avatar / nickname / birthday)
-  // so whatever they set in Settings shows up on the coach's roster.
+  // and their onboarding progress, so the coach roster shows both.
   const rows = data ?? [];
   const userIds = rows.map(r => r.user_id).filter((id): id is string => !!id);
+  const clientIds = rows.map(r => r.id);
 
   const profileMap: Record<string, { avatar_url?: string; nickname?: string; birthday?: string }> = {};
-  if (userIds.length) {
+  const progressMap: Record<string, number> = {};
+
+  if (rows.length) {
     const admin = await createAdminClient();
-    const { data: profiles } = await admin.from('profiles').select('*').in('id', userIds);
-    for (const p of profiles ?? []) {
-      profileMap[p.id] = { avatar_url: p.avatar_url, nickname: p.nickname, birthday: p.birthday };
+
+    if (userIds.length) {
+      const { data: profiles } = await admin.from('profiles').select('*').in('id', userIds);
+      for (const p of profiles ?? []) {
+        profileMap[p.id] = { avatar_url: p.avatar_url, nickname: p.nickname, birthday: p.birthday };
+      }
+    }
+
+    // Count completed onboarding steps per client.
+    const { data: progress } = await admin
+      .from('onboarding_progress')
+      .select('client_id')
+      .in('client_id', clientIds);
+    for (const p of progress ?? []) {
+      progressMap[p.client_id] = (progressMap[p.client_id] ?? 0) + 1;
     }
   }
 
@@ -34,6 +49,7 @@ export async function GET() {
     avatar_url: r.user_id ? profileMap[r.user_id]?.avatar_url ?? null : null,
     nickname:   r.user_id ? profileMap[r.user_id]?.nickname   ?? null : null,
     birthday:   r.user_id ? profileMap[r.user_id]?.birthday   ?? null : null,
+    onboarding_steps_done: progressMap[r.id] ?? 0,
   }));
 
   return NextResponse.json({ clients: enriched });

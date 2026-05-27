@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Topbar from '@/components/layout/Topbar';
+import PortalTopbar from '@/components/layout/PortalTopbar';
 import MiniCalendar from '@/components/ui/MiniCalendar';
 import { useCommunity, EVENT_STYLES } from '@/context/CommunityContext';
 import type { CommunityEvent, EventRSVP } from '@/lib/types';
@@ -221,7 +221,7 @@ export default function CommunityPage() {
 
   return (
     <>
-      <Topbar title="Community" statusLabel="Bulk · Week 8" />
+      <PortalTopbar title="Community" />
       <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           The <em className="italic" style={{ color: 'var(--accent-text)' }}>Community</em>

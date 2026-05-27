@@ -1,36 +1,54 @@
 import type { OnboardingStep } from '@/lib/types';
 
-export const onboardingSteps: OnboardingStep[] = [
+// ─── Canonical onboarding steps ──────────────────────────────────────────────
+//
+// This is the single source of truth for the onboarding flow. Both the client
+// page (app/onboarding) and the server (app/api/onboarding/me) import it.
+//
+// ⚠️ The `id` of each step is a STABLE KEY. It is stored in the
+//    onboarding_progress table to record what a client has finished. NEVER
+//    rename or reuse an id once clients may have completed it — add/remove
+//    whole steps instead.
+//
+// 🔧 Steps with `placeholder: true` still need real content from Sam:
+//    a hosted video URL, the Google Doc / Sheets link, etc. Swap in the real
+//    `url` and remove the flag when supplied — no DB change needed.
+
+export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    id: '1',
+    id: 'welcome',
     type: 'video',
     title: 'Welcome to SS Sustain',
     duration: '2 min',
     description: "A personal message from Coach Sam. What you've signed up for, what to expect, and how this journey works.",
+    placeholder: true, // TODO(Sam): welcome video URL
   },
   {
-    id: '2',
+    id: 'portal-tour',
     type: 'video',
     title: 'How to Use Your Portal',
     duration: '3 min',
-    description: 'A walkthrough of every section — training clips, coach messages, supplements, webinars, and more.',
+    description: 'A walkthrough of every section — training clips, supplements, webinars, posing, and more.',
+    placeholder: true, // TODO(Sam): portal walkthrough video URL
   },
   {
-    id: '3',
+    id: 'first-week',
     type: 'video',
     title: 'Your First Week — What to Expect',
     duration: '5 min',
     description: "What happens in week one: your programme, your macros, your first check-in. Don't skip this.",
+    placeholder: true, // TODO(Sam): first-week video URL
   },
   {
-    id: '4',
+    id: 'method',
     type: 'video',
     title: 'The SS Sustain Method',
     duration: '8 min',
     description: 'The philosophy behind the coaching — why consistency beats intensity, and how we measure progress.',
+    placeholder: true, // TODO(Sam): method video URL
   },
   {
-    id: '5',
+    id: 'onefit',
     type: 'video',
     title: 'Get set up on 1fit',
     duration: '3 min',
@@ -38,7 +56,7 @@ export const onboardingSteps: OnboardingStep[] = [
     url: 'https://www.loom.com/share/99d9072bf1dd438da8ab7423002d6782',
   },
   {
-    id: '5b',
+    id: 'myfitnesspal',
     type: 'video',
     title: 'Track your nutrition in MyFitnessPal',
     duration: '3 min',
@@ -46,21 +64,23 @@ export const onboardingSteps: OnboardingStep[] = [
     url: 'https://www.loom.com/share/035a1d6ce47c4e4e86faa5691711992e',
   },
   {
-    id: '6',
+    id: 'intake-form',
     type: 'doc',
     title: 'Complete your intake form',
     description: "Make a copy of Sam's Google doc intake form, fill it in fully, and send it back. This lets Sam personalise your programme from day one.",
     actionLabel: 'Open intake form',
+    placeholder: true, // TODO(Sam): Google Doc intake form share link
   },
   {
-    id: '6',
+    id: 'sheets-invite',
     type: 'action',
     title: 'Accept your Google Sheets invite',
     description: 'Check your email for an invite to your personal tracking spreadsheet. Accept it — this is where your weekly check-ins will live.',
     actionLabel: 'Mark as accepted',
+    placeholder: true, // TODO(Sam): confirm whether this stays manual or links somewhere
   },
   {
-    id: '7',
+    id: 'checkin-guide',
     type: 'doc',
     title: 'How to do your weekly check-in',
     description: "Your weekly check-in is the most important thing you do in this programme. Read this guide now so your first check-in is done correctly — photos, metrics, and summary all in the right place.",
@@ -68,7 +88,7 @@ export const onboardingSteps: OnboardingStep[] = [
     url: '/pdfs/check-in-process.pdf',
   },
   {
-    id: '8',
+    id: 'welcome-pack',
     type: 'doc',
     title: 'Read your welcome pack',
     description: 'Your full SS Sustain welcome pack covers everything you need to know before your first week. Read it end-to-end before moving on.',
@@ -76,10 +96,16 @@ export const onboardingSteps: OnboardingStep[] = [
     url: '/pdfs/welcome-guide.pdf',
   },
   {
-    id: '9',
+    id: 'agreement',
     type: 'action',
     title: 'Sign your coaching agreement',
     description: 'Sign and date the coaching agreement and send it back to Sam. Once this is done, your portal access is fully unlocked.',
     actionLabel: 'Mark as signed & sent',
+    placeholder: true, // TODO(Sam): decide how signing works (upload / e-sign / typed name)
   },
 ];
+
+// Stable keys, in order. Used server-side to validate a posted step and to
+// detect when every step is done.
+export const ONBOARDING_STEP_KEYS = ONBOARDING_STEPS.map((s) => s.id);
+export const ONBOARDING_TOTAL = ONBOARDING_STEPS.length;

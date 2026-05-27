@@ -7,7 +7,25 @@ import StatCard from '@/components/ui/StatCard';
 import { StatusPill, PayTag } from '@/components/ui/Pill';
 import { calcPaymentStatus } from '@/context/ClientContext';
 import { mapRow, type ClientRow } from '@/lib/clients';
+import { weekFromStart } from '@/lib/my-client';
+import { ONBOARDING_TOTAL } from '@/lib/onboarding';
 import type { Client, ClientStatus } from '@/lib/types';
+
+// Onboarding state for the roster: completed (green), in progress (amber), or
+// not started (grey). Reads from the per-client progress joined into /api/clients.
+function onboardingStatus(c: Client): { label: string; color: string } {
+  if (c.onboardingCompletedAt) return { label: 'Onboarded ✓', color: 'var(--accent-text)' };
+  const done = c.onboardingStepsDone ?? 0;
+  if (done === 0) return { label: 'Onboarding not started', color: 'var(--text3)' };
+  return { label: `Onboarding ${done}/${ONBOARDING_TOTAL}`, color: 'var(--amber)' };
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 function getSince() {
   const d = new Date();
@@ -187,7 +205,7 @@ export default function ClientRosterPage() {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openNotes, setOpenNotes] = useState<string | null>(null);
-  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string }>>({});
+  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string }>>({});
   const [saved, setSaved]         = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [deleting, setDeleting]   = useState<string | null>(null);
@@ -213,21 +231,40 @@ export default function ClientRosterPage() {
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
   const getDraft = (c: Client) =>
-    drafts[c.id] ?? { notes: c.notes, paymentDate: c.nextPaymentDate ?? '' };
+    drafts[c.id] ?? {
+      notes: c.notes,
+      paymentDate: c.nextPaymentDate ?? '',
+      goal: c.goal === '—' ? '' : c.goal,
+      programStart: c.programStart ?? '',
+    };
 
   const toggleNotes = (id: string) => setOpenNotes(openNotes === id ? null : id);
 
   const saveNote = async (c: Client) => {
     const d = getDraft(c);
+    const goal = d.goal.trim();
     const res = await fetch('/api/clients', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: c.id, notes: d.notes, next_payment_date: d.paymentDate || null }),
+      body: JSON.stringify({
+        id: c.id,
+        notes: d.notes,
+        next_payment_date: d.paymentDate || null,
+        goal: goal || null,
+        program_start: d.programStart || null,
+      }),
     });
     if (res.ok) {
       setRoster(prev => prev.map(x =>
         x.id === c.id
-          ? { ...x, notes: d.notes, nextPaymentDate: d.paymentDate || undefined, payment: calcPaymentStatus(d.paymentDate || undefined) }
+          ? {
+              ...x,
+              notes: d.notes,
+              nextPaymentDate: d.paymentDate || undefined,
+              payment: calcPaymentStatus(d.paymentDate || undefined),
+              goal: goal || '—',
+              programStart: d.programStart || undefined,
+            }
           : x
       ));
       setSaved(c.id);
@@ -271,7 +308,7 @@ export default function ClientRosterPage() {
           </button>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
-          All active and paused clients. Click a row to edit notes, payment, or remove the client.
+          All active and paused clients. Click a row to edit their phase, program start, notes, or payment — or remove the client.
         </p>
 
         <div className="grid grid-cols-3 gap-3 mb-6">
@@ -324,7 +361,11 @@ export default function ClientRosterPage() {
                         <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · &ldquo;{c.nickname}&rdquo;</span>
                       )}
                     </div>
-                    <div className="text-[11px]" style={{ color: 'var(--text3)' }}>{c.since}</div>
+                    <div className="text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text3)' }}>
+                      <span>{c.since}</span>
+                      <span style={{ color: 'var(--border2)' }}>·</span>
+                      <span style={{ color: onboardingStatus(c).color, fontWeight: 600 }}>{onboardingStatus(c).label}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="text-[13px]" style={{ color: 'var(--text2)' }}>{c.goal}</div>
@@ -342,6 +383,79 @@ export default function ClientRosterPage() {
                     className="rounded-xl p-[22px] mt-1 grid grid-cols-2 gap-6"
                     style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
                   >
+                    {/* Onboarding status — full width, read-only proof of completion */}
+                    <div
+                      className="col-span-2 rounded-[10px] px-4 py-3 flex items-center justify-between gap-4"
+                      style={{
+                        background: c.onboardingCompletedAt ? 'var(--accent-dim)' : 'var(--bg2)',
+                        border: `1px solid ${c.onboardingCompletedAt ? 'var(--accent-mid)' : 'var(--border)'}`,
+                      }}
+                    >
+                      <div>
+                        <h3 className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--text)' }}>
+                          Onboarding
+                        </h3>
+                        <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
+                          {c.onboardingCompletedAt
+                            ? `Completed all ${ONBOARDING_TOTAL} steps on ${formatDate(c.onboardingCompletedAt)}.`
+                            : `${c.onboardingStepsDone ?? 0} of ${ONBOARDING_TOTAL} steps done — not finished yet.`}
+                        </p>
+                      </div>
+                      <span
+                        className="text-[12px] font-semibold px-3 py-1.5 rounded-full flex-shrink-0"
+                        style={{ background: 'var(--surface)', color: onboardingStatus(c).color, border: '1px solid var(--border2)' }}
+                      >
+                        {onboardingStatus(c).label}
+                      </span>
+                    </div>
+
+                    {/* Phase (goal) — shows in the client's top-bar */}
+                    <div>
+                      <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>
+                        Current phase
+                      </h3>
+                      <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
+                        Shows in their portal top-bar as &ldquo;{getDraft(c).goal || 'Phase'} · Week {weekFromStart(getDraft(c).programStart) ?? 'N'}&rdquo;.
+                      </p>
+                      <input
+                        list="phase-options"
+                        value={getDraft(c).goal}
+                        onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), goal: e.target.value } }))}
+                        placeholder="e.g. Bulk"
+                        className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150"
+                        style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                        onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+                        onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
+                      />
+                      <datalist id="phase-options">
+                        {GOALS.map(g => <option key={g} value={g} />)}
+                      </datalist>
+                    </div>
+
+                    {/* Program start — drives the auto-incrementing week */}
+                    <div>
+                      <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>
+                        Program start date
+                      </h3>
+                      <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
+                        The week ticks over automatically from this date.
+                      </p>
+                      <input
+                        type="date"
+                        value={getDraft(c).programStart}
+                        onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), programStart: e.target.value } }))}
+                        className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150 mb-2"
+                        style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                        onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+                        onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
+                      />
+                      {getDraft(c).programStart && weekFromStart(getDraft(c).programStart) && (
+                        <p className="text-[11px]" style={{ color: 'var(--accent-text)' }}>
+                          Currently: Week {weekFromStart(getDraft(c).programStart)}
+                        </p>
+                      )}
+                    </div>
+
                     {/* Notes */}
                     <div>
                       <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>

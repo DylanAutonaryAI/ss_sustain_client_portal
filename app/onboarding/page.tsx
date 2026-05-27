@@ -1,40 +1,93 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { onboardingSteps } from '@/lib/mock-data/onboarding';
+import { ONBOARDING_STEPS } from '@/lib/onboarding';
 import SsLogo from '@/components/ui/SsLogo';
 
 export default function OnboardingPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+  const [completedAt, setCompletedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
-  const total = onboardingSteps.length;
-  const step = onboardingSteps[currentIdx];
+  const total = ONBOARDING_STEPS.length;
+  const step = ONBOARDING_STEPS[currentIdx];
   const isComplete = completed.has(step.id);
-  const allDone = completed.size >= total;
+  const isOpened = opened.has(step.id) || !step.url; // nothing to open → ready to confirm
+  const allDone = completedAt !== null;
 
-  const completeStep = () => {
-    const next = new Set([...completed, step.id]);
-    setCompleted(next);
-    if (currentIdx < total - 1) {
-      setCurrentIdx(currentIdx + 1);
+  // Hydrate progress from the server so a returning / cross-device client picks
+  // up exactly where they left off.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/onboarding/me', { cache: 'no-store' });
+        const data = await res.json();
+        if (!active) return;
+        if (res.ok) {
+          const done: string[] = data.completed ?? [];
+          setCompleted(new Set(done));
+          setCompletedAt(data.completedAt ?? null);
+          // Resume on the first unfinished step.
+          const firstUnfinished = ONBOARDING_STEPS.findIndex((s) => !done.includes(s.id));
+          setCurrentIdx(firstUnfinished === -1 ? total - 1 : firstUnfinished);
+        }
+      } catch {
+        // Offline / server hiccup — they can still work through it, saves will retry.
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [total]);
+
+  const openStep = () => {
+    if (step.url) window.open(step.url, '_blank', 'noopener,noreferrer');
+    setOpened((prev) => new Set(prev).add(step.id));
+  };
+
+  const completeStep = useCallback(async () => {
+    if (isComplete || saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch('/api/onboarding/me', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step_key: step.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not save your progress. Try again.');
+        return;
+      }
+      setCompleted(new Set<string>(data.completed ?? []));
+      setCompletedAt(data.completedAt ?? null);
+      if (currentIdx < total - 1) setCurrentIdx(currentIdx + 1);
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [isComplete, saving, step.id, currentIdx, total]);
 
-  const handleEnter = () => {
-    localStorage.setItem('ss-onboarding-done', 'true');
-    router.push('/portal/home');
-  };
-
-  const handleSkip = () => {
-    localStorage.setItem('ss-onboarding-done', 'true');
-    router.push('/portal/home');
-  };
+  const handleEnter = () => { router.push('/portal/home'); };
 
   const isLastStep = currentIdx === total - 1;
-  const canEnter = allDone || (isLastStep && isComplete);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <span className="text-[13px]" style={{ color: 'var(--text3)' }}>Loading your onboarding…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -71,6 +124,32 @@ export default function OnboardingPage() {
           />
         </div>
 
+        {/* All-done banner */}
+        {allDone && (
+          <div
+            className="rounded-[12px] px-5 py-4 mb-6 flex items-center justify-between gap-4"
+            style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)' }}
+          >
+            <div>
+              <p className="text-[14px] font-semibold mb-0.5" style={{ color: 'var(--accent-text)' }}>
+                🎉 Onboarding complete
+              </p>
+              <p className="text-[12px]" style={{ color: 'var(--text2)' }}>
+                Sam has been notified that you&apos;re all set. Welcome to SS Sustain.
+              </p>
+            </div>
+            <button
+              onClick={handleEnter}
+              className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 flex-shrink-0"
+              style={{ background: 'var(--accent)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+            >
+              Enter your portal →
+            </button>
+          </div>
+        )}
+
         {/* Current step card */}
         <div
           className="rounded-[14px] overflow-hidden mb-6"
@@ -103,18 +182,21 @@ export default function OnboardingPage() {
               <div
                 className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
                 style={{ background: 'var(--accent)' }}
-                onClick={() => {
-                  if (!isComplete) {
-                    if (step.url) window.open(step.url, '_blank', 'noopener,noreferrer');
-                    completeStep();
-                  }
-                }}
+                onClick={() => { if (!isComplete) openStep(); }}
               >
                 <div
                   className="ml-1"
                   style={{ width: 0, height: 0, borderTop: '10px solid transparent', borderBottom: '10px solid transparent', borderLeft: '17px solid #fff' }}
                 />
               </div>
+              {step.placeholder && (
+                <span
+                  className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] font-medium px-2 py-1 rounded text-center"
+                  style={{ background: 'rgba(0,0,0,0.55)', color: 'var(--text2)' }}
+                >
+                  Video coming soon — Sam is adding this
+                </span>
+              )}
               {step.duration && (
                 <span
                   className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-[1px] px-2 py-1 rounded"
@@ -155,38 +237,60 @@ export default function OnboardingPage() {
             <p className="text-[13px] leading-[1.75] mb-5" style={{ color: 'var(--text2)' }}>{step.description}</p>
 
             <div className="flex items-center gap-3 flex-wrap">
-              {!isLastStep || !canEnter ? (
-                <button
-                  onClick={() => {
-                    if (step.url && !isComplete) window.open(step.url, '_blank', 'noopener,noreferrer');
-                    completeStep();
-                  }}
-                  disabled={isComplete}
-                  className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-default"
-                  style={{ background: 'var(--accent)' }}
-                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.filter = 'brightness(1.08)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+              {isComplete ? (
+                <span
+                  className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold inline-flex items-center gap-1.5"
+                  style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)' }}
                 >
-                  {isComplete
-                    ? '✓ Done — move to next step ↓'
-                    : step.type === 'video'
-                    ? 'Mark as watched →'
-                    : step.actionLabel + ' →'}
-                </button>
-              ) : null}
-
-              {canEnter && (
+                  ✓ Done{!isLastStep && ' — next step below ↓'}
+                </span>
+              ) : !isOpened ? (
+                // Step has a link/video the client must open first.
                 <button
-                  onClick={handleEnter}
+                  onClick={openStep}
                   className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200"
                   style={{ background: 'var(--accent)' }}
                   onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.08)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
                 >
-                  Enter your portal →
+                  {step.type === 'video' ? 'Watch video ↗' : (step.actionLabel ?? 'Open') + ' ↗'}
+                </button>
+              ) : (
+                // Opened (or nothing to open) — confirm to mark complete.
+                <button
+                  onClick={completeStep}
+                  disabled={saving}
+                  className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-default"
+                  style={{ background: 'var(--accent)' }}
+                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.filter = 'brightness(1.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+                >
+                  {saving
+                    ? 'Saving…'
+                    : step.type === 'video'
+                    ? "✓ I've watched this"
+                    : step.type === 'doc'
+                    ? "✓ I've read this"
+                    : step.actionLabel ?? 'Mark as done'}
+                </button>
+              )}
+
+              {step.url && !isComplete && isOpened && (
+                <button
+                  onClick={openStep}
+                  className="text-[12px] transition-colors duration-150"
+                  style={{ color: 'var(--text3)' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text2)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; }}
+                >
+                  Open again ↗
                 </button>
               )}
             </div>
+
+            {error && (
+              <p className="text-[12px] mt-3" style={{ color: 'var(--red)' }}>{error}</p>
+            )}
           </div>
         </div>
 
@@ -196,7 +300,7 @@ export default function OnboardingPage() {
             All steps
           </p>
           <div className="flex flex-col gap-1.5">
-            {onboardingSteps.map((s, i) => {
+            {ONBOARDING_STEPS.map((s, i) => {
               const done = completed.has(s.id);
               const active = i === currentIdx;
               const locked = i > currentIdx && !done;
@@ -246,19 +350,6 @@ export default function OnboardingPage() {
               );
             })}
           </div>
-        </div>
-
-        {/* Admin bypass */}
-        <div className="mt-8 pt-5 flex justify-center" style={{ borderTop: '1px solid var(--border)' }}>
-          <button
-            onClick={handleSkip}
-            className="text-[11px] transition-colors duration-150"
-            style={{ color: 'var(--text3)' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text2)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; }}
-          >
-            Admin: skip onboarding and enter portal →
-          </button>
         </div>
       </div>
     </div>
