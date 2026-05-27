@@ -15,7 +15,7 @@ export default function WebinarsPage() {
           Webinar <em className="italic" style={{ color: 'var(--accent-text)' }}>Hub</em>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
-          Recorded deep dives from Sam. Click any to watch.
+          Recorded deep dives from Sam. Hit play on any to watch right here.
         </p>
 
         {webinars.length > 0 ? (
@@ -26,7 +26,7 @@ export default function WebinarsPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               {webinars.map((w) => (
-                <VideoCard key={w.id} tag={w.tag ?? ''} title={w.title} meta={w.meta} url={w.url} />
+                <VideoCard key={w.id} tag={w.tag ?? ''} title={w.title} meta={w.meta} url={w.url} embed />
               ))}
             </div>
           </>

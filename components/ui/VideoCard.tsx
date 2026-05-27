@@ -1,13 +1,65 @@
 'use client';
 
+// Turn a Loom share URL into its embeddable player URL, so the video plays
+// inline (showing Loom's own thumbnail + play) instead of opening a new tab.
+// Mirrors the helper used in the onboarding flow.
+function loomEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/loom\.com\/share\/([a-zA-Z0-9-]+)/);
+  return m ? `https://www.loom.com/embed/${m[1]}` : null;
+}
+
 interface VideoCardProps {
   tag: string;
   title: string;
   meta: string;
   url?: string;
+  /** Play the video inline (embedded Loom player) instead of opening a new tab. */
+  embed?: boolean;
 }
 
-export default function VideoCard({ tag, title, meta, url }: VideoCardProps) {
+export default function VideoCard({ tag, title, meta, url, embed }: VideoCardProps) {
+  const embedUrl = embed ? loomEmbedUrl(url) : null;
+
+  // Embedded mode: render the Loom player inline so it shows its own thumbnail
+  // and plays in place — matches the onboarding flow.
+  if (embedUrl) {
+    return (
+      <div
+        className="rounded-[10px] overflow-hidden"
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <div className="aspect-video relative" style={{ background: 'var(--bg3)' }}>
+          {tag && (
+            <span
+              className="absolute top-2 left-2 text-[9px] font-semibold tracking-[1px] uppercase px-[7px] py-[3px] rounded-[4px] z-10"
+              style={{ background: 'rgba(0,0,0,0.6)', color: 'var(--accent-text)' }}
+            >
+              {tag}
+            </span>
+          )}
+          <iframe
+            src={embedUrl}
+            title={title}
+            allowFullScreen
+            className="absolute inset-0 w-full h-full"
+            style={{ border: 0 }}
+          />
+        </div>
+        <div className="p-3">
+          <h4 className="text-[12px] font-medium mb-[2px] leading-[1.4]" style={{ color: 'var(--text)' }}>
+            {title}
+          </h4>
+          <p className="text-[11px]" style={{ color: 'var(--text3)' }}>{meta}</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleClick = () => {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };

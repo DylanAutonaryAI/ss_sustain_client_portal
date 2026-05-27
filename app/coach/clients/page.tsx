@@ -9,6 +9,7 @@ import { calcPaymentStatus } from '@/context/ClientContext';
 import { mapRow, type ClientRow } from '@/lib/clients';
 import { weekFromStart } from '@/lib/my-client';
 import { ONBOARDING_TOTAL } from '@/lib/onboarding';
+import { weekStats, type TrackerProfile, type TrackerLog } from '@/lib/tracker';
 import type { Client, ClientStatus } from '@/lib/types';
 
 // Onboarding state for the roster: completed (green), in progress (amber), or
@@ -210,6 +211,123 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
         </div>
       </div>
     </div>
+  );
+}
+
+const TRACKER_PURPLE = '#9b59b6';
+
+// Read-only view of ONE client's meal tracker, shown inside their expanded
+// roster row. Lazily fetches /api/tracker/client when the row opens (the
+// component only mounts then), so we don't pull every client's tracker upfront.
+function TrackerSummary({ clientId, clientName }: { clientId: string; clientName: string }) {
+  const [loading, setLoading]       = useState(true);
+  const [profile, setProfile]       = useState<TrackerProfile | null>(null);
+  const [weekLogs, setWeekLogs]     = useState<TrackerLog[]>([]);
+  const [recentLogs, setRecentLogs] = useState<TrackerLog[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/tracker/client?clientId=${encodeURIComponent(clientId)}`, { cache: 'no-store' });
+        const d = await res.json();
+        if (!alive) return;
+        setProfile(d.profile ?? null);
+        setWeekLogs(Array.isArray(d.weekLogs) ? d.weekLogs : []);
+        setRecentLogs(Array.isArray(d.recentLogs) ? d.recentLogs : []);
+      } catch { /* leave empty */ } finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [clientId]);
+
+  const firstName = clientName.split(' ')[0];
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
+
+  const wrap = (children: React.ReactNode) => (
+    <div className="col-span-2 rounded-[10px] px-4 py-3.5" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+      <div className="flex items-center gap-2 mb-2.5">
+        <h3 className="text-[13px] font-semibold" style={{ color: 'var(--text)' }}>Meal tracker</h3>
+        <span className="text-[11px]" style={{ color: 'var(--text3)' }}>off-plan meals &amp; nights out</span>
+      </div>
+      {children}
+    </div>
+  );
+
+  if (loading) return wrap(<p className="text-[12px]" style={{ color: 'var(--text3)' }}>Loading tracker…</p>);
+
+  if (!profile) {
+    return wrap(
+      <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
+        {firstName} hasn&rsquo;t set up their meal tracker yet — nothing logged.
+      </p>
+    );
+  }
+
+  const st = weekStats(profile, weekLogs);
+  const overBudget = st.status === 'over';
+  const statusColor = overBudget ? 'var(--red)' : 'var(--accent-text)';
+  const statusLabel = overBudget ? 'Over budget' : st.status === 'under' ? 'Under budget' : 'On track';
+
+  const chips: [string, string][] = [
+    ['Daily target', `${profile.calories.toLocaleString()} kcal`],
+    ['Goal', profile.goal],
+    ['Steps', profile.steps ? profile.steps.toLocaleString() : '—'],
+    ['Sessions/wk', profile.sessions != null ? String(profile.sessions) : '—'],
+  ];
+
+  return wrap(
+    <>
+      {/* This-week status */}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <div className="text-[12px]" style={{ color: 'var(--text3)' }}>Off-plan this week</div>
+          <div className="text-[15px] font-semibold" style={{ color: 'var(--text)' }}>
+            {st.consumed.toLocaleString()} <span style={{ color: 'var(--text3)', fontWeight: 400 }}>/ {st.budget.toLocaleString()} kcal budget</span>
+          </div>
+          <div className="text-[11px] mt-0.5" style={{ color: st.vs > 0 ? 'var(--red)' : 'var(--accent-text)' }}>
+            {st.vs > 0 ? '+' : ''}{st.vs.toLocaleString()} kcal vs expected by day {st.daysIn}
+          </div>
+        </div>
+        <span
+          className="text-[11px] font-semibold px-3 py-1.5 rounded-full flex-shrink-0"
+          style={{ background: 'var(--surface)', color: statusColor, border: `1px solid ${statusColor}` }}
+        >
+          {statusLabel}
+        </span>
+      </div>
+
+      {/* Setup chips */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {chips.map(([l, v]) => (
+          <span key={l} className="text-[11px] px-2.5 py-1 rounded-full" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
+            <span style={{ color: 'var(--text3)' }}>{l}:</span> {v}
+          </span>
+        ))}
+      </div>
+
+      {/* Recent logs */}
+      {recentLogs.length > 0 ? (
+        <div className="rounded-[8px]" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          {recentLogs.map((m, i) => (
+            <div key={m.id} className="flex items-center justify-between px-3 py-2" style={{ borderBottom: i < recentLogs.length - 1 ? '1px solid var(--border)' : 'none' }}>
+              <div className="min-w-0 flex items-center gap-2">
+                {m.isNightOut && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(155,89,182,0.12)', color: TRACKER_PURPLE }}>NIGHT OUT</span>}
+                <div className="min-w-0">
+                  <div className="text-[12px] font-medium truncate" style={{ color: 'var(--text)' }}>{m.label}</div>
+                  <div className="text-[11px]" style={{ color: 'var(--text3)' }}>{fmt(m.loggedOn)}{m.notes ? ` · ${m.notes}` : ''}</div>
+                </div>
+              </div>
+              <span className="text-[12px] font-semibold flex-shrink-0 ml-2" style={{ color: m.isNightOut ? TRACKER_PURPLE : 'var(--amber)' }}>{m.cal.toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[12px]" style={{ color: 'var(--text3)' }}>Set up, but nothing logged yet.</p>
+      )}
+    </>
   );
 }
 
@@ -437,6 +555,9 @@ export default function ClientRosterPage() {
                         {onboardingStatus(c).label}
                       </span>
                     </div>
+
+                    {/* Meal tracker — read-only, lazily loaded when this row opens */}
+                    <TrackerSummary clientId={c.id} clientName={c.name} />
 
                     {/* Client status + reason (full width) */}
                     <div className="col-span-2">

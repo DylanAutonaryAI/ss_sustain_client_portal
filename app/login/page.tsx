@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import SsLogo from '@/components/ui/SsLogo';
+import LoginSplash from '@/components/ui/LoginSplash';
 
 export default function LoginPage() {
   const [tab, setTab]           = useState<'client' | 'coach'>('client');
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [splash, setSplash]     = useState(false);
   const supabase = createClient();
 
   async function handleLogin(e: React.FormEvent) {
@@ -50,7 +52,12 @@ export default function LoginPage() {
     // Fresh login → clear any leftover onboarding skip so the flow shows again
     // every time (testing mode). Harmless in prod once ONBOARDING_TEST_MODE is off.
     sessionStorage.removeItem('ss-dev-skip');
-    window.location.href = role === 'coach' ? '/coach/overview' : '/portal/home';
+
+    // Play the swoosh splash, then hard-navigate. The hard nav keeps the white
+    // splash on screen until the dashboard document loads underneath it.
+    const dest = role === 'coach' ? '/coach/overview' : '/portal/home';
+    setSplash(true);
+    setTimeout(() => { window.location.href = dest; }, 1000);
   }
 
   async function handleReset(e: React.FormEvent) {
@@ -90,6 +97,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--bg)' }}>
+      {splash && <LoginSplash />}
       <div className="w-full max-w-[400px]">
         {/* Logo */}
         <div className="flex items-center gap-2.5 justify-center mb-8">

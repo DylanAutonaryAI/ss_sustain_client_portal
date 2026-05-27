@@ -50,6 +50,12 @@ export default function ClientSidebar() {
       ],
     },
     {
+      label: 'Nutrition',
+      items: [
+        { label: 'Meal Tracker', href: '/portal/tracker', icon: Icons.utensils },
+      ],
+    },
+    {
       label: 'Community',
       items: [
         { label: 'Events & Calls', href: '/portal/community', icon: Icons.calendar, badge: badge('client:community') },

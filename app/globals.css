@@ -107,6 +107,26 @@ body {
    containing block for fixed-position modals). A touch longer so it registers. */
 .animate-page       { animation: fadeIn 0.28s ease-out both; }
 
+/* ── Login splash — Sam's logo swooshes into centre on a white screen (Twitch-style) ── */
+@keyframes splashSwoosh {
+  0%   { transform: translateX(-55vw) scale(0.7) rotate(-4deg); opacity: 0; filter: blur(12px); }
+  55%  { transform: translateX(3%) scale(1.07) rotate(1deg);    opacity: 1; filter: blur(0); }
+  72%  { transform: translateX(-1.5%) scale(0.98) rotate(0deg); }
+  100% { transform: translateX(0) scale(1) rotate(0deg);        opacity: 1; }
+}
+@keyframes splashStreak {
+  0%   { transform: translateX(-20vw) skewX(-14deg); opacity: 0; }
+  30%  { opacity: 0.85; }
+  100% { transform: translateX(120vw) skewX(-14deg); opacity: 0; }
+}
+@keyframes splashWord {
+  0%, 45% { opacity: 0; transform: translateY(8px); }
+  100%    { opacity: 1; transform: translateY(0); }
+}
+.animate-splash-logo   { animation: splashSwoosh 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+.animate-splash-streak { animation: splashStreak 0.65s ease-in-out both; }
+.animate-splash-word   { animation: splashWord 0.85s ease-out both; }
+
 /* Wrap an expandable section in .animate-accordion; its single child holds the
    content (it gets clipped while the grid row grows from 0fr to 1fr). */
 .animate-accordion       { display: grid; grid-template-rows: 1fr; animation: accordionDown 0.24s ease-out both; }

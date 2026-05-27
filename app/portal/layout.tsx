@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { ONBOARDING_TEST_MODE } from '@/lib/onboarding';
 import ClientSidebar from '@/components/layout/ClientSidebar';
+import ChatWidget from '@/components/assistant/ChatWidget';
 
 // Sections whose record_page_view call is currently in flight, so a StrictMode
 // double-mount / rapid re-render can't fire duplicate calls for the same one.
@@ -96,6 +97,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <main className="flex-1 min-h-screen" style={{ marginLeft: '220px' }}>
         {children}
       </main>
+      <ChatWidget />
     </div>
   );
 }

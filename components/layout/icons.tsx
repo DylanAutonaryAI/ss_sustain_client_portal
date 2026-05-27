@@ -114,6 +114,12 @@ export const Icons = {
       <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
     </svg>
   ),
+  utensils: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+      <path d="M3 2v7a3 3 0 003 3v10M9 2v7a3 3 0 01-3 3M6 2v6"/>
+      <path d="M16 2c-1.5 0-3 2-3 5s1.5 4 3 4v9"/>
+    </svg>
+  ),
   gear: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
       <circle cx="12" cy="12" r="3"/>
