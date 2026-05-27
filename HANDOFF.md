@@ -33,6 +33,39 @@ place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 ---
 
 ## 🔴 Active — in progress right now
+**Social / meal tracker → built into the portal (per-client, coach-visible).**
+Sam's standalone HTML tracker (off-plan meal + night-out calorie logging), rebuilt
+natively in the portal so it's per-client and **Sam can actually see engagement**.
+- **DB: `db/2026-05-28_tracker.sql`** — `tracker_profiles` (one-time per-client setup:
+  daily calorie target / goal / steps / sessions) + `tracker_logs` (each off-plan meal
+  or night out; weekly totals summed from `logged_on`). RLS locked; all access via the
+  service-role routes (same pattern as `page_views` / `referral_leads`).
+  **⚠️ RUN THIS IN SUPABASE** — until then the tracker's GET/POST/PUT all fail.
+- `lib/tracker.ts` — Sam's calorie data ported verbatim (12 drinks w/ units, 9 meal
+  presets, 13 fast-food brands w/ items, late-night food, recovery suggestions) +
+  `weekStats` (Monday-start weekly maths) + `weekStartISO`. Plain module (no `'use client'`)
+  so the client page and the API routes can both import it.
+- `app/api/tracker/me/route.ts` — the signed-in client's own tracker (GET profile +
+  this-week logs / POST setup / PUT add a log / DELETE own log), scoped to `user.id`.
+  `app/api/tracker/client/route.ts` — **coach-only** read of ONE client's tracker by
+  `clients.id` (verifies `coach_id === user.id`, resolves their `user_id`).
+- `app/portal/tracker/page.tsx` — full client UI, portal-themed (CSS vars, serif
+  headings, light/dark): This-Week dashboard (budget / consumed / vs-expected, day dots,
+  off-plan log w/ delete), Log Meal (quick picks + fast-food picker + manual), Night-Out
+  mode (drink counter w/ units + late food), Recovery plan (shown when over). Nav entry
+  added to `ClientSidebar` ("Meal Tracker", new `utensils` icon).
+- `app/coach/clients/page.tsx` — the expanded roster row now shows a read-only
+  **`TrackerSummary`** (lazily fetched on open): setup chips, this-week off-plan total
+  vs budget + status pill, and recent logs (night-out tagged). Sam's per-client view.
+- **GATE — run `db/2026-05-28_tracker.sql`,** then smoke-test: client sets up → logs a
+  meal / night out → coach opens that client's row and sees it.
+- **Decisions (Dylan):** adapt to the portal theme (done); coach sees it by expanding the
+  client roster row (done). Does NOT replace 1fit/MyFitnessPal — it's the interactive
+  engagement layer Sam can actually see.
+
+---
+
+### Also live, awaiting Sam — Onboarding flow (Gate 2 only)
 **Onboarding flow → made real. Engine built; going-live is gated on 2 things.**
 - Was a front-end shell (localStorage only, no coach visibility, skippable,
   duplicate-id bug). Now Supabase-backed:
@@ -78,6 +111,12 @@ place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-28 — Webinars now embed the Loom player inline** (matches the onboarding flow).
+  `components/ui/VideoCard.tsx` gained an opt-in `embed` prop + a `loomEmbedUrl` helper
+  (`loom.com/share/{id}` → `loom.com/embed/{id}`); `app/portal/webinars/page.tsx` passes
+  `embed` so each webinar plays in place (Loom's own thumbnail) instead of opening a new
+  tab. Training Clips still uses the clicker (same component, `embed` left off there).
+  Shipped as part of commit `6ff3487`.
 - **2026-05-27 (late) — DEPLOYMENT RESOLUTION: got `app.sssustain.com` live + login/onboarding working.**
   Long chain of Vercel issues, each fixed:
   1. **Vercel env vars were missing/wrong** → builds failed, then ran but broke at runtime.
@@ -234,9 +273,9 @@ place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 - **Reinstate server-side route protection** — `middleware.ts` was deleted after edge
   500s. Today protection is client-side only (layouts) + API 401s. Re-add once the edge
   `MIDDLEWARE_INVOCATION_FAILED` cause is understood (or do it without edge middleware).
-- **Social / meal tracker — the next big feature** (per CLAUDE.md, Sam-requested, top
-  engagement priority). Per-client logging Sam can click into to see if they logged.
-  **Blocked on Sam sending his current tracker** so we know what it captures.
+- **Social / meal tracker — BUILT (see Active).** Run `db/2026-05-28_tracker.sql`, then
+  smoke-test the client→coach round-trip. Possible follow-ups Sam may want: email/WhatsApp
+  nudges on streaks or no-logs, a coach-side "who logged this week" summary on the overview.
 - **Onboarding go-live** — only Gate 2 left: Sam's **welcome video** + **portal walkthrough**
   Loom URLs (the SQL is applied). Then optionally wire the completion email to Sam.
 - **Resend domain verification** — until done, invite emails only reach the Resend account
@@ -273,9 +312,12 @@ place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
   `status_reason` + `status_note` to `clients` for the new Paused/Cancelled reasons. Until
   applied, saving a Paused/Cancelled client errors. (If a CHECK constraint blocks the
   'Cancelled' value, drop it — see the note in the SQL file.)
+- **`db/2026-05-28_tracker.sql` — RUN IN SUPABASE (not yet applied).** Creates
+  `tracker_profiles` + `tracker_logs` for the meal tracker. Until applied, the tracker
+  page can't save setup or log meals, and the coach's roster TrackerSummary shows empty.
 - Invite emails: Resend sandbox sender only reaches the Resend account owner until a
   domain is verified in Resend + the Supabase SMTP "from" is updated.
 
 ---
 
-**Last updated:** 2026-05-27 — deployment resolution: site LIVE on app.sssustain.com (Vercel preset/env/middleware/auth-lock all fixed)
+**Last updated:** 2026-05-28 — social/meal tracker built (per-client, coach-visible; needs `db/2026-05-28_tracker.sql` run in Supabase); webinars now embed Loom inline
