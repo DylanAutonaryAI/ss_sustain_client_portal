@@ -9,25 +9,24 @@ import { ONBOARDING_STEP_KEYS } from '@/lib/onboarding';
 
 // GET → { completed: string[], completedAt: string | null, isClient: boolean }
 export async function GET() {
-  // TEMP: wrapped so any thrown error (e.g. missing SUPABASE_SERVICE_ROLE_KEY →
-  // "supabaseKey is required") is surfaced to the client instead of a bare 500.
+  // Wrapped defensively: a thrown error here must not 500 the portal gate (which
+  // would block the whole portal). On failure we report "not a client" and the
+  // gate fails open.
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized', isClient: false, _debug: { caught: 'no user' } });
+    if (!user) return NextResponse.json({ error: 'Unauthorized', isClient: false }, { status: 401 });
 
-    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
     const admin = await createAdminClient();
-    const { data: client, error: clientErr } = await admin
+    const { data: client } = await admin
       .from('clients')
       .select('id, onboarding_completed_at')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    const _debug = { user: user.email, uid: user.id, err: clientErr?.message ?? null, hasServiceKey };
-
+    // No client row (e.g. a coach) → onboarding doesn't apply.
     if (!client) {
-      return NextResponse.json({ completed: [], completedAt: null, isClient: false, _debug });
+      return NextResponse.json({ completed: [], completedAt: null, isClient: false });
     }
 
     const { data: rows } = await admin
@@ -39,13 +38,9 @@ export async function GET() {
       completed: (rows ?? []).map((r) => r.step_key),
       completedAt: client.onboarding_completed_at,
       isClient: true,
-      _debug,
     });
-  } catch (e) {
-    return NextResponse.json({
-      isClient: false,
-      _debug: { caught: e instanceof Error ? e.message : String(e), hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY },
-    });
+  } catch {
+    return NextResponse.json({ isClient: false, completed: [], completedAt: null });
   }
 }
 

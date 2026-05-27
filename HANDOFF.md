@@ -15,16 +15,20 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-27, late)
-Most recent event: a **production 500 fire** — the edge `middleware.ts` kept throwing
-`MIDDLEWARE_INVOCATION_FAILED` and taking the whole site down, so it was **removed
-entirely** (commit bf9ebf0). Auth still holds (API routes 401, login redirects
-client-side) but **server-side route protection is gone and needs reinstating** — see
-Still to do / Watch out. Before that, this session added **UI / motion polish** and
-**onboarding UX** (inline Loom video embeds, dev testing mode, team photo) — see Recently
-done. Working tree is clean (all committed). Workflow reminder: `git pull` at start →
-work in ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
-NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally first.
+## 📌 Latest handoff note (2026-05-27, late) — SITE IS LIVE ✅
+**`app.sssustain.com` is up and working** (login both roles, onboarding gate, profile).
+Getting there was a long Vercel fight — root causes, all now fixed (see "Deployment
+resolution" in Recently done): **Framework Preset was "Other" → Next.js**, **`NEXT_PUBLIC_*`
+env vars were marked Sensitive → made non-sensitive**, **`SUPABASE_SERVICE_ROLE_KEY` had the
+wrong value (and the key was pasted in the Note field, not Value)**, the **edge middleware
+was removed** (kept 500-ing), and the **Supabase auth lock was deadlocking the browser →
+replaced with a no-op lock**.
+
+⚠️ **THREE things carry forward — see Watch out:** (1) **deploys now go to the `main`
+branch** (Vercel's production branch), not `master`; (2) **server-side route protection
+needs reinstating** (middleware was removed); (3) **rotate the `service_role` key** (it
+appeared in screenshots during debugging). Workflow: `git pull` at start → work in ONE
+place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 
 ---
 
@@ -74,6 +78,32 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-27 (late) — DEPLOYMENT RESOLUTION: got `app.sssustain.com` live + login/onboarding working.**
+  Long chain of Vercel issues, each fixed:
+  1. **Vercel env vars were missing/wrong** → builds failed, then ran but broke at runtime.
+     Now set: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+     `NEXT_PUBLIC_SITE_URL=https://app.sssustain.com`.
+  2. **`NEXT_PUBLIC_*` were marked "Sensitive"** → not shipped to the browser → anon key absent →
+     all logins failed. **Fix: the two `NEXT_PUBLIC_*` must be NON-sensitive.** (`SERVICE_ROLE_KEY`
+     stays sensitive — server only.)
+  3. **Framework Preset was "Other"** → Vercel served the build as static files, every page 404'd.
+     **Fix: Framework Preset = Next.js.** (This was the big one.)
+  4. **Edge middleware kept 500-ing** (`MIDDLEWARE_INVOCATION_FAILED`) → **removed `middleware.ts`**.
+  5. **`SUPABASE_SERVICE_ROLE_KEY` had the wrong value** (anon key) and later was pasted into the
+     **Note** field instead of **Value** → admin client ran without privileges (RLS blocked it) →
+     `/api/onboarding/me` returned `isClient:false`, `/api/clients/me` 500'd. **Fix: real
+     service_role key (role `service_role`) in the Value field.**
+  6. **Supabase auth lock deadlocked the browser** — `getSession()`/`get_my_role` hung, profile
+     never loaded ("Hello there"). `navigator.locks` and `processLock` both hung. **Fix: no-op
+     `lock` in `lib/supabase/client.ts`** (single shared browser client).
+  7. Coach login flashed-then-reset and onboarding/logout were flaky → fixed the **coach & portal
+     layouts** (don't redirect on a still-loading `user`), **hardened logout** (timeout so it can't
+     hang), and **AuthContext** (only wipe `user` on explicit `SIGNED_OUT`).
+  - **Onboarding test-mode is LIVE** (`ONBOARDING_TEST_MODE` in `lib/onboarding.ts`): client sees
+    onboarding **every** login + an **admin skip button**; login clears the skip flag. **Set the
+    flag to `false` at go-live** and remove the skip button.
+  - **Deploys now target the `main` branch** (Vercel's production branch). We push `master:main`
+    each time. Cleaner long-term: point Vercel's production branch back at `master` + delete `main`.
 - **2026-05-27 (late) — Production 500 fire: edge middleware removed.**
   - Commits `01646f6` (harden middleware to fail-open) → `e95c1c0` (drop Supabase SDK
     from the edge) → `bf9ebf0` (**delete `middleware.ts` entirely**). Even a trivial
@@ -215,6 +245,21 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
   the top-bar currently uses the `goal` field as the phase.
 
 ## ⚠️ Watch out
+- **🔑 ROTATE the `service_role` key.** It was visible in screenshots while debugging the
+  Vercel env vars. Supabase → Settings → API → roll the `service_role` key, then update
+  `SUPABASE_SERVICE_ROLE_KEY` in Vercel (Value field, Sensitive ON, Production) **and**
+  local `.env.local`, then redeploy. Do this before real client data is in.
+- **Deploys go to the `main` branch, not `master`.** Vercel's production branch is `main`.
+  We push `master:main` each deploy. To go live, code must reach `main`. (Cleaner: set
+  Vercel's production branch back to `master` in Settings → Git/Environments, delete `main`.)
+- **Vercel env vars (production):** the two `NEXT_PUBLIC_*` keys must be **NON-sensitive**
+  (or they won't reach the browser → logins break). `SUPABASE_SERVICE_ROLE_KEY` must be the
+  real `service_role` key (role `service_role`) in the **Value** field. **Framework Preset
+  must stay "Next.js"** (if it flips to "Other", every page 404s).
+- **`ONBOARDING_TEST_MODE = true`** (`lib/onboarding.ts`) forces onboarding on every login +
+  shows the admin skip button **in production** (for testing). **Set it `false` at go-live.**
+- **Browser auth uses a no-op `lock`** (`lib/supabase/client.ts`) — both `navigator.locks`
+  and `processLock` deadlocked `getSession()`. Don't re-introduce a blocking lock.
 - **No edge middleware** — `middleware.ts` was removed (it 500'd the whole site). Don't
   re-add an edge middleware without solving `MIDDLEWARE_INVOCATION_FAILED` first, or the
   site goes down. Route protection is currently client-side only.
@@ -233,4 +278,4 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
 
 ---
 
-**Last updated:** 2026-05-27 — UI/motion polish + onboarding UX; logged the edge-middleware 500 removal
+**Last updated:** 2026-05-27 — deployment resolution: site LIVE on app.sssustain.com (Vercel preset/env/middleware/auth-lock all fixed)
