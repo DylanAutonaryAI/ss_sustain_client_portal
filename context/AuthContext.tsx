@@ -119,6 +119,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         new Promise((resolve) => setTimeout(resolve, 2500)),
       ]);
     } catch { /* ignore — navigate anyway */ }
+    // Belt-and-suspenders: hard-expire the Supabase auth cookies + clear any
+    // leftover supabase keys, so logout FULLY clears even a wedged session
+    // (signOut can silently fail on a clobbered/multi-role session).
+    try {
+      document.cookie.split(';').forEach((c) => {
+        const name = c.split('=')[0].trim();
+        if (name.startsWith('sb-') && name.includes('auth-token')) {
+          document.cookie = `${name}=; Max-Age=0; path=/`;
+        }
+      });
+      Object.keys(localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k));
+    } catch { /* ignore */ }
     window.location.href = '/login';
   };
 
