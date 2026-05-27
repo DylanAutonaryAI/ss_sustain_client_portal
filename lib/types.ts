@@ -143,9 +143,10 @@ export interface OnboardingStep {
   title: string;
   description: string;
   duration?: string;
-  actionLabel?: string;
+  actionLabel?: string;   // label for the "open the link" button
+  confirmLabel?: string;  // label for the "mark complete" button (overrides the default)
   url?: string;
-  placeholder?: boolean; // true = still needs Sam's real video/link/PDF
+  placeholder?: boolean;  // true = still needs Sam's real video/link/PDF
 }
 
 export type EventType = 'live-call' | 'q-and-a' | 'workshop' | 'challenge' | 'social';

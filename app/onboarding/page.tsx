@@ -135,7 +135,7 @@ export default function OnboardingPage() {
                 🎉 Onboarding complete
               </p>
               <p className="text-[12px]" style={{ color: 'var(--text2)' }}>
-                Sam has been notified that you&apos;re all set. Welcome to SS Sustain.
+                Your portal is now fully unlocked. Welcome to SS Sustain.
               </p>
             </div>
             <button
@@ -267,6 +267,8 @@ export default function OnboardingPage() {
                 >
                   {saving
                     ? 'Saving…'
+                    : step.confirmLabel
+                    ? step.confirmLabel
                     : step.type === 'video'
                     ? "✓ I've watched this"
                     : step.type === 'doc'

@@ -44,11 +44,28 @@ NOTE: pushing to `master` auto-deploys to Vercel (production) — test locally f
 - **⚠️ GATE 1 — run `db/2026-05-27_onboarding_progress.sql` in Supabase.** Until then
   the onboarding API errors (table/column missing). Optional grandfather block inside
   marks current clients onboarded so the DB gate doesn't bounce them.
-- **GATE 2 — content from Sam:** real videos, intake-form Google Doc link, Sheets-invite
-  process, welcome-pack final PDF, how agreement signing works, WhatsApp invite link,
-  confirmed concise step list.
-- **Deferred:** email to Sam on completion (decided in-portal-only for now); hook is
-  stubbed in the POST route — needs `RESEND_API_KEY` + Sam's address to switch on.
+- **DECISION (2026-05-27): portal onboarding COMPLEMENTS Sam's Brevo flow, doesn't
+  replace it.** Sam's real onboarding runs outside the portal — Jotform application →
+  Calendly call → **Brevo 2-day** flow (Day 1 info sheet + 1fit/Sheets/Notion invites;
+  Day 2 welcome pack sign & date) → per-client **Loom** assessment-week video. By the
+  time a client has portal access they've done all that. So the gate is **light** and
+  doesn't duplicate Brevo. Final step list (6), confirmed with Dylan:
+  1. Welcome video *(placeholder — Sam recording this week)*
+  2. How to use your portal *(placeholder — Sam will record; Dylan confident)*
+  3. Get set up on 1fit *(real Loom ✅)*
+  4. Track your nutrition in MyFitnessPal *(real Loom ✅ — Dylan confirmed keep)*
+  5. Sign your welcome pack *(confirmation "clicker" — signing stays in Brevo; ✅ done)*
+  6. Join the SS Sustain community *(real WhatsApp link ✅ — group "SS Sustained Coaching")*
+  Cut: first-week (Sam: covered by his Loom video), SS-Sustain-method, intake form,
+  Sheets invite (Sam handles manually). **Notion step dropped — the portal REPLACES
+  Notion.** Welcome-pack signing stays in **Brevo**; portal carries only a confirm clicker.
+- **GATE 2 — pending from Sam:** the **welcome video** + **portal walkthrough** video
+  Loom URLs. Those are the only content blockers left; the rest of the gate is live.
+- **Deferred:** email to Sam on completion (decided in-portal-only for now — roster badge
+  is the proof); hook stubbed in the POST route, needs `RESEND_API_KEY` + Sam's address.
+- **Referral scheme terms captured** (separate feature, not onboarding): £100/referral,
+  paid after 3 months if they sign up monthly, paid immediately if they join upfront on
+  a 3/6/12-month plan. Feeds the still-to-build referral page + leaderboard.
 
 ## ✅ Recently done
 - **2026-05-27 — Analytics page real + view tracking + critical client-auth fix.**
