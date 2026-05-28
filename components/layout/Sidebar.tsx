@@ -63,7 +63,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className="w-[220px] min-h-screen fixed top-0 left-0 z-60 flex flex-col"
+      className="w-[220px] h-screen fixed top-0 left-0 z-60 flex flex-col"
       style={{
         background: 'var(--sidebar-bg)',
         borderRight: '1px solid var(--border)',
@@ -123,7 +123,7 @@ export default function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2.5 py-2.5 overflow-y-auto flex flex-col gap-px">
+      <nav className="flex-1 min-h-0 px-2.5 py-2.5 overflow-y-auto flex flex-col gap-px">
         {sections.map((section) => (
           <div key={section.label}>
             <div
