@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
 
   const adminClient = await createAdminClient();
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  // Strip any trailing slash so the redirect is always exactly `<origin>/auth/callback`
+  // (a trailing slash here → `…com//auth/callback`, which fails Supabase's redirect
+  // allow-list match and silently falls back to the Site URL → user lands on /login).
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
   // Send Supabase invite email — redirectTo sends them to our auth callback after password set
   const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
