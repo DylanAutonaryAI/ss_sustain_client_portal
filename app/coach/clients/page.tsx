@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
@@ -224,6 +224,7 @@ function TrackerSummary({ clientId, clientName }: { clientId: string; clientName
   const [profile, setProfile]       = useState<TrackerProfile | null>(null);
   const [weekLogs, setWeekLogs]     = useState<TrackerLog[]>([]);
   const [recentLogs, setRecentLogs] = useState<TrackerLog[]>([]);
+  const [resetting, setResetting]   = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -244,6 +245,21 @@ function TrackerSummary({ clientId, clientName }: { clientId: string; clientName
   const fmt = (iso: string) => {
     const d = new Date(iso);
     return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
+
+  const resetTracker = async () => {
+    if (!window.confirm(
+      `Reset ${firstName}'s meal tracker?\n\nThis permanently deletes all their logged meals & nights out and their setup. They'll start fresh next time they open it. The tracker itself stays available.`,
+    )) return;
+    setResetting(true);
+    const res = await fetch(`/api/tracker/client?clientId=${encodeURIComponent(clientId)}`, { method: 'DELETE' });
+    if (res.ok) {
+      setProfile(null); setWeekLogs([]); setRecentLogs([]);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      window.alert(d.error || 'Failed to reset tracker.');
+    }
+    setResetting(false);
   };
 
   const wrap = (children: React.ReactNode) => (
@@ -327,6 +343,20 @@ function TrackerSummary({ clientId, clientName }: { clientId: string; clientName
       ) : (
         <p className="text-[12px]" style={{ color: 'var(--text3)' }}>Set up, but nothing logged yet.</p>
       )}
+
+      {/* Reset — clears this client's logs + setup (testing / fresh start) */}
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={resetTracker}
+          disabled={resetting}
+          className="text-[11px] font-semibold px-3 py-1.5 rounded-[7px] transition-all duration-150 disabled:opacity-60"
+          style={{ background: 'transparent', border: '1px solid rgba(240,79,79,0.4)', color: 'var(--red)', cursor: resetting ? 'default' : 'pointer' }}
+          onMouseEnter={(e) => { if (!resetting) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(240,79,79,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+        >
+          {resetting ? 'Resetting…' : 'Reset tracker'}
+        </button>
+      </div>
     </>
   );
 }
@@ -361,6 +391,21 @@ export default function ClientRosterPage() {
   }, []);
 
   useEffect(() => { fetchClients(); }, [fetchClients]);
+
+  // Deep-link from the Overview "recent clients" list: /coach/clients?open=<id>
+  // opens that client's row once the roster has loaded, then scrolls to it.
+  const deepLinkApplied = useRef(false);
+  useEffect(() => {
+    if (deepLinkApplied.current || loading) return;
+    const id = new URLSearchParams(window.location.search).get('open');
+    if (!id) { deepLinkApplied.current = true; return; }
+    if (!roster.some(c => c.id === id)) return; // wait until the row exists
+    deepLinkApplied.current = true;
+    setOpenNotes(id);
+    requestAnimationFrame(() => {
+      document.getElementById(`client-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [loading, roster]);
 
   const getDraft = (c: Client) =>
     drafts[c.id] ?? {
@@ -481,7 +526,7 @@ export default function ClientRosterPage() {
           </div>
 
           {roster.map((c, i) => (
-            <div key={c.id}>
+            <div key={c.id} id={`client-${c.id}`} style={{ scrollMarginTop: 90 }}>
               <div
                 className="grid items-center px-5 py-3 cursor-pointer transition-colors duration-100"
                 style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', borderBottom: '1px solid var(--border)' }}

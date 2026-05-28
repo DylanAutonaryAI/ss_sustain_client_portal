@@ -1,8 +1,15 @@
+'use client';
+
+import { useEffect } from 'react';
+import { playSwoosh } from '@/lib/sound';
+
 // Full-screen white splash shown the moment login succeeds: Sam's logo swooshes
 // into the centre with a green streak whooshing across (Twitch scene-transition
-// feel), then the page hard-navigates to the dashboard underneath it. Reduced
-// motion just shows the logo (the global media query zeroes the animations).
+// feel) and a sheen/sword-swing sound, then the page hard-navigates to the
+// dashboard underneath it. Reduced motion just shows the logo (the global media
+// query zeroes the animations). The swoosh sound is always on.
 export default function LoginSplash() {
+  useEffect(() => { playSwoosh(); }, []);
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center overflow-hidden"

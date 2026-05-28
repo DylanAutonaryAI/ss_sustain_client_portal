@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
 import ChurnAlert from '@/components/ui/ChurnAlert';
@@ -9,6 +10,7 @@ import { useClientRoster } from '@/lib/clients';
 import { usePayments, computeMrr, formatGBP } from '@/lib/payments';
 
 export default function CoachOverviewPage() {
+  const router = useRouter();
   const { clients, loading } = useClientRoster();
   const { payments } = usePayments();
   const mrr = computeMrr(payments, clients);
@@ -79,11 +81,13 @@ export default function CoachOverviewPage() {
           {recent.map((c, i) => (
             <div
               key={c.id}
-              className="grid items-center px-5 py-3 transition-colors duration-100"
+              className="grid items-center px-5 py-3 cursor-pointer transition-colors duration-100"
               style={{
                 gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr',
                 borderBottom: i < recent.length - 1 ? '1px solid var(--border)' : 'none',
               }}
+              onClick={() => router.push(`/coach/clients?open=${encodeURIComponent(c.id)}`)}
+              title={`Open ${c.name}'s profile`}
               onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg2)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = ''; }}
             >

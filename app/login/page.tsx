@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import SsLogo from '@/components/ui/SsLogo';
 import LoginSplash from '@/components/ui/LoginSplash';
+import { primeAudio } from '@/lib/sound';
 
 export default function LoginPage() {
   const [tab, setTab]           = useState<'client' | 'coach'>('client');
@@ -21,6 +22,7 @@ export default function LoginPage() {
     if (!email.trim() || !password.trim()) { setError('Please enter your email and password.'); return; }
     setLoading(true);
     setError('');
+    primeAudio(); // unlock audio inside the click gesture so the splash swoosh can play
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 

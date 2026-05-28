@@ -47,3 +47,34 @@ export async function GET(request: NextRequest) {
     recentLogs: (recentRows ?? []).map(mapLog),
   });
 }
+
+// Coach resets ONE of their clients' trackers: wipes every logged meal / night
+// out AND the setup, so the client starts fresh. Scoped to coach_id so a coach
+// can only ever clear their own clients' data.
+export async function DELETE(request: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: role } = await supabase.rpc('get_my_role');
+  if (role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const clientId = new URL(request.url).searchParams.get('clientId');
+  if (!clientId) return NextResponse.json({ error: 'clientId is required' }, { status: 400 });
+
+  const admin = await createAdminClient();
+  const { data: client } = await admin
+    .from('clients')
+    .select('user_id')
+    .eq('id', clientId)
+    .eq('coach_id', user.id)
+    .maybeSingle();
+  if (!client?.user_id) return NextResponse.json({ error: 'Client not found.' }, { status: 404 });
+  const uid = client.user_id;
+
+  const logsDel = await admin.from('tracker_logs').delete().eq('user_id', uid).eq('coach_id', user.id);
+  if (logsDel.error) return NextResponse.json({ error: logsDel.error.message }, { status: 500 });
+  const profileDel = await admin.from('tracker_profiles').delete().eq('user_id', uid).eq('coach_id', user.id);
+  if (profileDel.error) return NextResponse.json({ error: profileDel.error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
+}

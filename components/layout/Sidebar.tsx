@@ -1,11 +1,14 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import SoundToggle from './SoundToggle';
 import SsLogo from '@/components/ui/SsLogo';
+import { playClick, initSoundPref } from '@/lib/sound';
 
 export interface NavItem {
   label: string;
@@ -40,6 +43,20 @@ export default function Sidebar({
   const pathname = usePathname();
   const { logout } = useAuth();
   const homeHref = isCoach ? '/coach/overview' : '/portal/home';
+
+  // Client portal only: a soft click on any button / nav link (tab change).
+  // Delegated capture-phase listener, so we don't have to wire every button.
+  // playClick() itself respects the on/off toggle.
+  useEffect(() => {
+    if (isCoach) return;
+    initSoundPref();
+    const onClick = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement | null)?.closest('button, a[href], [role="button"]');
+      if (el) playClick();
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [isCoach]);
 
   return (
     <aside
@@ -150,6 +167,7 @@ export default function Sidebar({
       {/* Footer */}
       <div className="p-4 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border)' }}>
         <ThemeToggle />
+        {!isCoach && <SoundToggle />}
         <button
           onClick={logout}
           className="w-full py-2 rounded-[7px] text-[12px] font-medium transition-all duration-150 text-center"
