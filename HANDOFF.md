@@ -15,53 +15,37 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-27, late) — SITE IS LIVE ✅
-**`app.sssustain.com` is up and working** (login both roles, onboarding gate, profile).
-Getting there was a long Vercel fight — root causes, all now fixed (see "Deployment
-resolution" in Recently done): **Framework Preset was "Other" → Next.js**, **`NEXT_PUBLIC_*`
-env vars were marked Sensitive → made non-sensitive**, **`SUPABASE_SERVICE_ROLE_KEY` had the
-wrong value (and the key was pasted in the Note field, not Value)**, the **edge middleware
-was removed** (kept 500-ing), and the **Supabase auth lock was deadlocking the browser →
-replaced with a no-op lock**.
+## 📌 Latest handoff note (2026-05-28) — tracker + assistant shipped; SITE LIVE ✅
+**`app.sssustain.com` is live and stable** (login both roles, onboarding gate, profile).
+The 2026-05-28 sessions shipped the **social/meal tracker** (per-client, coach-visible),
+a **client AI assistant**, **sound effects + login splash**, and a batch of fixes
+(community calendar now clickable, sidebar sign-out clipping, per-client tracker reset,
+clickable overview "recent clients"). All on `main` (auto-deploys). Latest commit `ba84f33`.
 
-⚠️ **THREE things carry forward — see Watch out:** (1) **deploys now go to the `main`
-branch** (Vercel's production branch), not `master`; (2) **server-side route protection
-needs reinstating** (middleware was removed); (3) **rotate the `service_role` key** (it
-appeared in screenshots during debugging). Workflow: `git pull` at start → work in ONE
-place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
+⚠️ **Carry-forward before real clients / go-live (see Watch out):**
+1. **Run `db/2026-05-28_tracker.sql`** in Supabase — the tracker has no table yet, so
+   setup/logging fails and the coach summary is empty until it's applied.
+2. **Run `db/2026-05-27_client_status_reason.sql`** — still not verified.
+3. **Set `ANTHROPIC_API_KEY`** in Vercel — the AI assistant returns a 503 without it.
+4. **Rotate the `service_role` key** (it appeared in screenshots while debugging).
+5. **Flip `ONBOARDING_TEST_MODE` → false** + remove the admin skip button at go-live.
+6. **Reinstate server-side route protection** (edge middleware was removed).
+
+Deploys go to **`main`** (we push `master:main`). Workflow: `git pull` at start → work in
+ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 
 ---
 
 ## 🔴 Active — in progress right now
-**Social / meal tracker → built into the portal (per-client, coach-visible).**
-Sam's standalone HTML tracker (off-plan meal + night-out calorie logging), rebuilt
-natively in the portal so it's per-client and **Sam can actually see engagement**.
-- **DB: `db/2026-05-28_tracker.sql`** — `tracker_profiles` (one-time per-client setup:
-  daily calorie target / goal / steps / sessions) + `tracker_logs` (each off-plan meal
-  or night out; weekly totals summed from `logged_on`). RLS locked; all access via the
-  service-role routes (same pattern as `page_views` / `referral_leads`).
-  **⚠️ RUN THIS IN SUPABASE** — until then the tracker's GET/POST/PUT all fail.
-- `lib/tracker.ts` — Sam's calorie data ported verbatim (12 drinks w/ units, 9 meal
-  presets, 13 fast-food brands w/ items, late-night food, recovery suggestions) +
-  `weekStats` (Monday-start weekly maths) + `weekStartISO`. Plain module (no `'use client'`)
-  so the client page and the API routes can both import it.
-- `app/api/tracker/me/route.ts` — the signed-in client's own tracker (GET profile +
-  this-week logs / POST setup / PUT add a log / DELETE own log), scoped to `user.id`.
-  `app/api/tracker/client/route.ts` — **coach-only** read of ONE client's tracker by
-  `clients.id` (verifies `coach_id === user.id`, resolves their `user_id`).
-- `app/portal/tracker/page.tsx` — full client UI, portal-themed (CSS vars, serif
-  headings, light/dark): This-Week dashboard (budget / consumed / vs-expected, day dots,
-  off-plan log w/ delete), Log Meal (quick picks + fast-food picker + manual), Night-Out
-  mode (drink counter w/ units + late food), Recovery plan (shown when over). Nav entry
-  added to `ClientSidebar` ("Meal Tracker", new `utensils` icon).
-- `app/coach/clients/page.tsx` — the expanded roster row now shows a read-only
-  **`TrackerSummary`** (lazily fetched on open): setup chips, this-week off-plan total
-  vs budget + status pill, and recent logs (night-out tagged). Sam's per-client view.
-- **GATE — run `db/2026-05-28_tracker.sql`,** then smoke-test: client sets up → logs a
-  meal / night out → coach opens that client's row and sees it.
-- **Decisions (Dylan):** adapt to the portal theme (done); coach sees it by expanding the
-  client roster row (done). Does NOT replace 1fit/MyFitnessPal — it's the interactive
-  engagement layer Sam can actually see.
+**Nothing in active development right now.** The 2026-05-28 sessions shipped the meal
+tracker, the AI assistant, sound effects, and a batch of fixes — all live on `main`
+(see Recently done). What's left is **operational, not code:**
+- **Run `db/2026-05-28_tracker.sql`** in Supabase, then smoke-test the meal-tracker
+  round-trip: client sets up → logs a meal / night out → coach opens that client's roster
+  row and sees it (and can hit **Reset tracker** to wipe that client's data).
+- **Set `ANTHROPIC_API_KEY`** in Vercel so the client AI assistant answers (it returns a
+  graceful 503 until then), then test it from a client login.
+- **Onboarding go-live** — still gated on Sam's 2 Loom videos (detail below).
 
 ---
 
@@ -111,6 +95,51 @@ natively in the portal so it's per-client and **Sam can actually see engagement*
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-28 — Social / meal tracker BUILT & shipped (per-client, coach-visible).**
+  Sam's standalone HTML tracker rebuilt natively in the portal so it's per-client and Sam
+  can see engagement. Commits `6ff3487` (build) + `ea19a80` (reset + overview link).
+  - **DB: `db/2026-05-28_tracker.sql`** — `tracker_profiles` (per-client setup: daily
+    calorie target / goal / steps / sessions) + `tracker_logs` (each off-plan meal or night
+    out; weekly totals summed from `logged_on`). RLS locked; service-role routes only.
+    **⚠️ NOT YET RUN IN SUPABASE — see Watch out.**
+  - `lib/tracker.ts` — Sam's calorie data ported verbatim (12 drinks w/ units, 9 meal
+    presets, 13 fast-food brands, late-night food, recovery suggestions) + `weekStats`
+    (Monday-start) + `weekStartISO`. Plain module so the client page + API routes both import it.
+  - `app/api/tracker/me` — client's own tracker (GET / POST setup / PUT log / DELETE log),
+    scoped to `user.id`. `app/api/tracker/client` — coach-only read of ONE client by
+    `clients.id` (GET) **+ DELETE = reset** (wipes that client's logs + setup, scoped to `coach_id`).
+  - `app/portal/tracker/page.tsx` — full client UI, portal-themed: This-Week dashboard,
+    Log Meal (quick picks + fast-food picker + manual), Night-Out mode (drink counter +
+    units + late food), Recovery plan. Nav entry in `ClientSidebar` ("Meal Tracker", `utensils` icon).
+  - `app/coach/clients/page.tsx` — expanded roster row shows a read-only **`TrackerSummary`**
+    (lazy-loaded): setup chips, this-week off-plan total vs budget + status, recent logs
+    (night-out tagged), and a **"Reset tracker"** button. NOTE: headline numbers are *this
+    week*; the recent-logs list keeps the last 10 across weeks (so history isn't lost).
+  - **Overview "recent clients" rows are now clickable** → `/coach/clients?open=<id>`; the
+    roster reads the param and **auto-expands + scrolls** to that client.
+  - **Decisions (Dylan):** portal-themed (done); coach sees it via the roster row (done).
+    Does NOT replace 1fit/MyFitnessPal — it's the engagement layer Sam can see.
+- **2026-05-28 — Community calendar days are clickable** (commit `d7b784d`).
+  `components/ui/MiniCalendar.tsx`: every day is selectable now (was only days *with*
+  events) — click a date to filter the events list to it; pointer + hover on all days;
+  today shown subtly (accent-dim + ring) vs the solid-green selected day; the detail panel
+  shows "No events scheduled this day" for empty dates. Coach Community: clicking a day also
+  **prefills the add-event form's date + opens the form** (click a day → schedule on it).
+- **2026-05-28 — Sidebar sign-out no longer clipped** (commit `ba84f33`).
+  The added Sound-effects toggle made the footer taller; the `<aside>` was `min-h-screen`
+  (unbounded) + fixed, so Sign out fell below the viewport. Fix: `h-screen` on the aside +
+  `min-h-0` on the scrollable `<nav>` so it shrinks/scrolls and the footer (toggles + Sign
+  out) stays pinned and fully visible at any window height.
+- **2026-05-28 — Client AI assistant + sound effects + login splash (parallel session).**
+  - **AI assistant** — `@anthropic-ai/sdk`; `app/api/assistant/route.ts` (Node runtime,
+    client-gated, graceful 503 when `ANTHROPIC_API_KEY` is unset); `lib/assistant/knowledge.ts`
+    (static guide + dynamic per-client context); `components/assistant/ChatWidget.tsx`.
+    **⚠️ Needs `ANTHROPIC_API_KEY` in Vercel — see Watch out.**
+  - **Sound effects** — `lib/sound.ts` + `components/layout/SoundToggle.tsx`: a soft
+    nav/action click on the client portal (capture-phase listener in `Sidebar`), toggle in
+    the sidebar footer, on/off persisted. Client only (coach side stays silent).
+  - **Login splash** — `components/ui/LoginSplash.tsx` plays on sign-in before the hard
+    nav to the dashboard.
 - **2026-05-28 — Webinars now embed the Loom player inline** (matches the onboarding flow).
   `components/ui/VideoCard.tsx` gained an opt-in `embed` prop + a `loomEmbedUrl` helper
   (`loom.com/share/{id}` → `loom.com/embed/{id}`); `app/portal/webinars/page.tsx` passes
@@ -273,9 +302,13 @@ natively in the portal so it's per-client and **Sam can actually see engagement*
 - **Reinstate server-side route protection** — `middleware.ts` was deleted after edge
   500s. Today protection is client-side only (layouts) + API 401s. Re-add once the edge
   `MIDDLEWARE_INVOCATION_FAILED` cause is understood (or do it without edge middleware).
-- **Social / meal tracker — BUILT (see Active).** Run `db/2026-05-28_tracker.sql`, then
-  smoke-test the client→coach round-trip. Possible follow-ups Sam may want: email/WhatsApp
-  nudges on streaks or no-logs, a coach-side "who logged this week" summary on the overview.
+- **Social / meal tracker — BUILT & shipped (see Recently done).** Run
+  `db/2026-05-28_tracker.sql`, then smoke-test the client→coach round-trip. Possible
+  follow-ups Sam may want: email/WhatsApp nudges on streaks or no-logs, a coach-side "who
+  logged this week" summary on the overview.
+- **AI assistant — set `ANTHROPIC_API_KEY` in Vercel** (Production, Sensitive) so it
+  actually answers; it's client-gated and 503s until then. Then test from a client login.
+  Future: feed it more SS Sustain knowledge in `lib/assistant/knowledge.ts`.
 - **Onboarding go-live** — only Gate 2 left: Sam's **welcome video** + **portal walkthrough**
   Loom URLs (the SQL is applied). Then optionally wire the completion email to Sam.
 - **Resend domain verification** — until done, invite emails only reach the Resend account
@@ -315,9 +348,11 @@ natively in the portal so it's per-client and **Sam can actually see engagement*
 - **`db/2026-05-28_tracker.sql` — RUN IN SUPABASE (not yet applied).** Creates
   `tracker_profiles` + `tracker_logs` for the meal tracker. Until applied, the tracker
   page can't save setup or log meals, and the coach's roster TrackerSummary shows empty.
+- **AI assistant needs `ANTHROPIC_API_KEY`** (Vercel → Production, Sensitive; server-only).
+  Without it `app/api/assistant` returns a 503 and the chat says it's "not set up yet."
 - Invite emails: Resend sandbox sender only reaches the Resend account owner until a
   domain is verified in Resend + the Supabase SMTP "from" is updated.
 
 ---
 
-**Last updated:** 2026-05-28 — social/meal tracker built (per-client, coach-visible; needs `db/2026-05-28_tracker.sql` run in Supabase); webinars now embed Loom inline
+**Last updated:** 2026-05-28 — meal tracker + AI assistant + sound effects shipped; community calendar clickable; sidebar sign-out clipping fixed. Gates: run `db/2026-05-28_tracker.sql`, set `ANTHROPIC_API_KEY`.
