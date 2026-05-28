@@ -92,9 +92,9 @@ export default function TrackerPage() {
   return (
     <>
       <Topbar title="Meal Tracker" statusLabel="Your account" />
-      <div className="px-6 py-7 mx-auto" style={{ maxWidth: 620 }}>
+      <div className="px-6 md:px-8 py-7 mx-auto w-full" style={{ maxWidth: view === 'dashboard' ? 1040 : 620 }}>
         {!needsSetup && view !== 'recovery' && (
-          <div className="flex rounded-[10px] p-0.5 mb-5" style={{ background: 'var(--bg3)', border: '1px solid var(--border)' }}>
+          <div className="flex rounded-[10px] p-0.5 mb-5 max-w-[620px] mx-auto" style={{ background: 'var(--bg3)', border: '1px solid var(--border)' }}>
             {([['dashboard', 'This Week'], ['log', 'Log Meal'], ['nightout', 'Night Out'], ['setup', 'Settings']] as const).map(([v, l]) => (
               <button key={v} onClick={() => setView(v)}
                 className="flex-1 py-2 text-[12px] font-semibold rounded-[7px] transition-all"
@@ -211,6 +211,9 @@ function DashboardView({ profile, weekLogs, onLog, onNightOut, onDelete }: {
     <div>
       <Heading title="This" em="Week" sub="this is what actually matters" />
 
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+      {/* Left: headline status + numbers + weekly progress */}
+      <div>
       <div style={card({ background: 'var(--bg2)', border: `1px solid ${statusC}`, textAlign: 'center', padding: '20px 16px' })}>
         <span className="text-[10px] font-bold px-2 py-[3px] rounded-full uppercase tracking-[0.4px]" style={{ background: 'var(--bg3)', color: statusC, border: `1px solid ${statusC}` }}>{statusLabel}</span>
         <div className="font-serif mt-2.5" style={{ fontSize: 42, lineHeight: 1, color: 'var(--text)' }}>
@@ -248,7 +251,10 @@ function DashboardView({ profile, weekLogs, onLog, onNightOut, onDelete }: {
           })}
         </div>
       </div>
+      </div>
 
+      {/* Right: off-plan log + mindset + actions */}
+      <div>
       {weekLogs.length > 0 ? (
         <div style={card()}>
           <div className="text-[12px] font-semibold mb-3 uppercase tracking-[0.06em]" style={{ color: 'var(--text2)' }}>Off-plan log</div>
@@ -278,6 +284,8 @@ function DashboardView({ profile, weekLogs, onLog, onNightOut, onDelete }: {
 
       <button onClick={onLog} style={primaryBtn({ background: 'var(--amber)', marginBottom: 8 })}>+ Log off-plan meal</button>
       <button onClick={onNightOut} style={ghostBtn({ border: `1px solid ${PURPLE}`, color: PURPLE })}>🍺 Night out mode</button>
+      </div>
+      </div>
     </div>
   );
 }
