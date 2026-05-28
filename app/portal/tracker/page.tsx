@@ -92,7 +92,7 @@ export default function TrackerPage() {
   return (
     <>
       <Topbar title="Meal Tracker" statusLabel="Your account" />
-      <div className="px-6 md:px-8 py-7 mx-auto w-full" style={{ maxWidth: view === 'dashboard' ? 1040 : 620 }}>
+      <div className="px-6 md:px-8 py-7 mx-auto w-full" style={{ maxWidth: 1040 }}>
         {!needsSetup && view !== 'recovery' && (
           <div className="flex rounded-[10px] p-0.5 mb-5 max-w-[620px] mx-auto" style={{ background: 'var(--bg3)', border: '1px solid var(--border)' }}>
             {([['dashboard', 'This Week'], ['log', 'Log Meal'], ['nightout', 'Night Out'], ['setup', 'Settings']] as const).map(([v, l]) => (
@@ -157,6 +157,8 @@ function SetupView({ profile, onSaved }: { profile: TrackerProfile | null; onSav
   return (
     <div>
       <Heading title="Your" em="Setup" sub="takes 30 seconds — you can change it anytime" />
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+      <div>
       <div style={card()}>
         <label style={label}>Daily calorie target</label>
         <input type="number" style={input} placeholder="e.g. 1800" value={calories || ''} onChange={(e) => setCalories(+e.target.value)} />
@@ -170,6 +172,8 @@ function SetupView({ profile, onSaved }: { profile: TrackerProfile | null; onSav
           ))}
         </div>
       </div>
+      </div>
+      <div>
       <div style={card()}>
         <label style={label}>Average daily steps</label>
         <div className="flex gap-1.5">
@@ -185,6 +189,8 @@ function SetupView({ profile, onSaved }: { profile: TrackerProfile | null; onSav
             <button key={n} onClick={() => setSessions(n)} style={seg(sessions === n)}>{n}</button>
           ))}
         </div>
+      </div>
+      </div>
       </div>
       {err && <div className="text-[12px] mb-2" style={{ color: 'var(--red)' }}>{err}</div>}
       <button onClick={save} disabled={!ok || saving} style={primaryBtn({ opacity: ok && !saving ? 1 : 0.5 })}>
@@ -322,14 +328,9 @@ function LogMealView({ profile, onLogged, onNightOut }: {
       <Heading title="Log your" em="Meal" sub="no judgment — let's work with it" />
       <button onClick={onNightOut} style={ghostBtn({ border: `1px solid ${PURPLE}`, color: PURPLE, marginBottom: 12 })}>🍺 Switch to Night Out mode</button>
 
-      <div style={card({ background: cal > profile.calories ? 'rgba(240,79,79,0.08)' : 'var(--accent-dim)', border: `1px solid ${cal > profile.calories ? 'var(--red)' : 'var(--accent-mid)'}`, padding: '14px 16px' })}>
-        <div className="flex items-center justify-between">
-          <div className="text-center flex-1"><div style={statNum}>{profile.calories.toLocaleString()}</div><div style={statLabel}>Daily target</div></div>
-          <div className="text-[16px] font-semibold" style={{ color: 'var(--text3)' }}>vs</div>
-          <div className="text-center flex-1"><div style={{ ...statNum, color: cal ? 'var(--red)' : 'var(--text3)' }}>{cal ? cal.toLocaleString() : '—'}</div><div style={statLabel}>This meal</div></div>
-        </div>
-      </div>
-
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+      {/* Left: choose what you ate */}
+      <div>
       <div className="flex gap-1.5 mb-3">
         {(['quick', 'fastfood'] as const).map((t) => (
           <button key={t} onClick={() => { setTab(t); reset(); }}
@@ -406,6 +407,17 @@ function LogMealView({ profile, onLogged, onNightOut }: {
           </div>
         </div>
       )}
+      </div>
+
+      {/* Right: your entry */}
+      <div>
+      <div style={card({ background: cal > profile.calories ? 'rgba(240,79,79,0.08)' : 'var(--accent-dim)', border: `1px solid ${cal > profile.calories ? 'var(--red)' : 'var(--accent-mid)'}`, padding: '14px 16px' })}>
+        <div className="flex items-center justify-between">
+          <div className="text-center flex-1"><div style={statNum}>{profile.calories.toLocaleString()}</div><div style={statLabel}>Daily target</div></div>
+          <div className="text-[16px] font-semibold" style={{ color: 'var(--text3)' }}>vs</div>
+          <div className="text-center flex-1"><div style={{ ...statNum, color: cal ? 'var(--red)' : 'var(--text3)' }}>{cal ? cal.toLocaleString() : '—'}</div><div style={statLabel}>This meal</div></div>
+        </div>
+      </div>
 
       <div style={card()}>
         <label style={label}>Notes (optional)</label>
@@ -415,6 +427,8 @@ function LogMealView({ profile, onLogged, onNightOut }: {
       <button onClick={logIt} disabled={!cal || saving} style={primaryBtn({ background: overBy > 0 ? 'var(--amber)' : 'var(--accent)', opacity: cal && !saving ? 1 : 0.5 })}>
         {saving ? 'Saving…' : overBy > 0 ? `Calculate recovery (${overBy.toLocaleString()} over)` : 'Log this meal ✓'}
       </button>
+      </div>
+      </div>
     </div>
   );
 }
@@ -461,6 +475,9 @@ function NightOutView({ profile, onLogged, onSkip }: {
         </div>
       </div>
 
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+      {/* Left: the drinks */}
+      <div>
       <div style={card()}>
         <label style={label}>Add your drinks</label>
         {DRINKS.map((d, i) => (
@@ -478,7 +495,10 @@ function NightOutView({ profile, onLogged, onSkip }: {
           </div>
         ))}
       </div>
+      </div>
 
+      {/* Right: food, warning, notes */}
+      <div>
       <div style={card()}>
         <label style={label}>Late night food? (optional)</label>
         <div className="flex flex-wrap gap-2">
@@ -501,6 +521,8 @@ function NightOutView({ profile, onLogged, onSkip }: {
       <div style={card()}>
         <label style={label}>Notes (optional)</label>
         <input type="text" style={input} placeholder="e.g. Lads weekend, worth every pint 🍺" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      </div>
       </div>
 
       <button onClick={logIt} disabled={!totalCal || saving} style={ghostBtn({ border: `1px solid ${PURPLE}`, color: PURPLE, opacity: totalCal && !saving ? 1 : 0.5, marginBottom: 8 })}>
@@ -526,7 +548,7 @@ function RecoveryView({ over, isNightOut, onDone }: { over: number; isNightOut: 
   const toneColor = (t: RecoveryOption['tone']) => t === 'green' ? 'var(--accent-text)' : t === 'gold' ? 'var(--amber)' : 'var(--text3)';
 
   return (
-    <div>
+    <div className="max-w-[680px] mx-auto">
       <Heading title="Recovery" em="Plan" sub="your week is still on track" />
       <div style={card({ background: isNightOut ? PURPLE_DIM : 'var(--accent-dim)', border: `1px solid ${isNightOut ? `${PURPLE}55` : 'var(--accent-mid)'}`, textAlign: 'center', padding: '24px 16px' })}>
         <div className="text-[44px] mb-2">{hero.e}</div>
