@@ -34,12 +34,14 @@ export function isSoundEnabled() { return enabled; }
 export function setSoundEnabled(on: boolean) {
   enabled = on;
   if (typeof window !== 'undefined') localStorage.setItem('ss-sound', on ? 'on' : 'off');
-  if (on) playClick(); // immediate feedback when switching on
+  if (on) playNav(); // immediate feedback when switching on (toggle lives in the sidebar)
 }
 
 // Soft, pleasant click — two consonant sine partials with a quick decay. Low
-// volume so frequent clicks never grate.
-export function playClick() {
+// volume so frequent clicks never grate. Two voices:
+//   • playNav()    — sidebar nav / tab clicks (lower, softer)
+//   • playAction() — anything clicked inside the page content (brighter, higher)
+function tick(f1: number, f2: number) {
   if (!enabled) return;
   const ac = getCtx();
   if (!ac) return;
@@ -51,7 +53,7 @@ export function playClick() {
   out.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
   out.connect(ac.destination);
 
-  [660, 990].forEach((freq, i) => {
+  [f1, f2].forEach((freq, i) => {
     const osc = ac.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, now);
@@ -63,6 +65,9 @@ export function playClick() {
     osc.stop(now + 0.14);
   });
 }
+
+export function playNav()    { tick(660, 990); }   // left sidebar — lower
+export function playAction() { tick(1040, 1560); } // inside a tab — higher / brighter
 
 // Sheen / sword-swing — a band-passed noise burst whose centre frequency sweeps
 // up then down, giving the "whoosh". Used for the login transition only.

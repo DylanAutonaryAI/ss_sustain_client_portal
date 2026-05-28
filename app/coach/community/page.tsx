@@ -369,7 +369,11 @@ export default function CoachCommunityPage() {
             <MiniCalendar
               events={sorted}
               selectedDate={selectedDate}
-              onDaySelect={setSelectedDate}
+              onDaySelect={(d) => {
+                setSelectedDate(d);
+                // Picking a day also primes the add-event form for that date.
+                if (d) { setForm(f => ({ ...f, date: d })); setAddOpen(true); }
+              }}
               showLegend
             />
           </div>

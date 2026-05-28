@@ -133,24 +133,22 @@ export default function MiniCalendar({
             return (
               <button
                 key={i}
-                onClick={() => {
-                  if (hasEvents && onDaySelect) {
-                    onDaySelect(isSelected ? null : ds);
-                  }
-                }}
+                onClick={() => { if (onDaySelect) onDaySelect(isSelected ? null : ds); }}
                 className="h-[34px] flex flex-col items-center justify-center rounded-[7px] gap-[2px] transition-all duration-100"
                 style={{
-                  background: isSelected || isToday ? 'var(--accent)' : 'none',
+                  background: isSelected ? 'var(--accent)' : isToday ? 'var(--accent-dim)' : 'none',
                   border: '1px solid transparent',
-                  boxShadow: isToday ? '0 0 0 2px var(--accent-mid)' : 'none',
-                  cursor: hasEvents && onDaySelect ? 'pointer' : 'default',
-                  opacity: isPast && !isToday ? 0.4 : 1,
+                  boxShadow: isToday && !isSelected ? '0 0 0 2px var(--accent-mid)' : 'none',
+                  cursor: onDaySelect ? 'pointer' : 'default',
+                  opacity: isPast && !isToday ? 0.55 : 1,
                 }}
+                onMouseEnter={e => { if (onDaySelect && !isSelected) (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg2)'; }}
+                onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = isToday ? 'var(--accent-dim)' : 'none'; }}
               >
                 <span
                   className="text-[11.5px] font-medium leading-none"
                   style={{
-                    color: isSelected || isToday ? '#fff' : 'var(--text)',
+                    color: isSelected ? '#fff' : isToday ? 'var(--accent-text)' : 'var(--text)',
                   }}
                 >
                   {day}
@@ -161,7 +159,7 @@ export default function MiniCalendar({
                       <div
                         key={ev.id}
                         className="w-[5px] h-[5px] rounded-full"
-                        style={{ background: isSelected || isToday ? '#fff' : EVENT_STYLES[ev.type].color }}
+                        style={{ background: isSelected ? '#fff' : EVENT_STYLES[ev.type].color }}
                       />
                     ))}
                   </div>
@@ -173,32 +171,36 @@ export default function MiniCalendar({
       </div>
 
       {/* Selected day detail */}
-      {selectedDate && selectedDayEvents.length > 0 && (
+      {selectedDate && (
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 14px 14px' }}>
           <p className="text-[10px] font-semibold uppercase tracking-[0.8px] mb-2" style={{ color: 'var(--text3)' }}>
             {new Date(selectedDate + 'T12:00:00').toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
-          <div className="flex flex-col gap-2">
-            {selectedDayEvents.map(ev => {
-              const style = EVENT_STYLES[ev.type];
-              return (
-                <div key={ev.id} className="flex items-start gap-2.5">
-                  <div
-                    className="w-[3px] self-stretch rounded-full flex-shrink-0 mt-[2px]"
-                    style={{ background: style.color }}
-                  />
-                  <div>
-                    <p className="text-[12px] font-semibold leading-none mb-[3px]" style={{ color: 'var(--text)' }}>
-                      {ev.title}
-                    </p>
-                    <p className="text-[10.5px]" style={{ color: 'var(--text3)' }}>
-                      {ev.time} · {ev.duration}
-                    </p>
+          {selectedDayEvents.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {selectedDayEvents.map(ev => {
+                const style = EVENT_STYLES[ev.type];
+                return (
+                  <div key={ev.id} className="flex items-start gap-2.5">
+                    <div
+                      className="w-[3px] self-stretch rounded-full flex-shrink-0 mt-[2px]"
+                      style={{ background: style.color }}
+                    />
+                    <div>
+                      <p className="text-[12px] font-semibold leading-none mb-[3px]" style={{ color: 'var(--text)' }}>
+                        {ev.title}
+                      </p>
+                      <p className="text-[10.5px]" style={{ color: 'var(--text3)' }}>
+                        {ev.time} · {ev.duration}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-[11.5px]" style={{ color: 'var(--text3)' }}>No events scheduled this day.</p>
+          )}
         </div>
       )}
 

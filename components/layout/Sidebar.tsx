@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import SoundToggle from './SoundToggle';
 import SsLogo from '@/components/ui/SsLogo';
-import { playClick, initSoundPref } from '@/lib/sound';
+import { playNav, playAction, initSoundPref } from '@/lib/sound';
 
 export interface NavItem {
   label: string;
@@ -52,7 +52,10 @@ export default function Sidebar({
     initSoundPref();
     const onClick = (e: MouseEvent) => {
       const el = (e.target as HTMLElement | null)?.closest('button, a[href], [role="button"]');
-      if (el) playClick();
+      if (!el) return;
+      // Left sidebar (the <aside>) → nav tone; anything inside the page → action tone.
+      if (el.closest('aside')) playNav();
+      else playAction();
     };
     document.addEventListener('click', onClick, true);
     return () => document.removeEventListener('click', onClick, true);
