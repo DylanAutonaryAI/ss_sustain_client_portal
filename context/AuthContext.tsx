@@ -46,16 +46,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
+    // Safety net: never let the initial auth check freeze the UI. The portal
+    // holds its "Loading…" state until `loading` is false, so if getSession or
+    // loadProfile is slow / hangs (a stalled network request can't be caught),
+    // flip it false after a short cap and render anyway — loadProfile keeps
+    // running and fills in the name when it resolves. The normal fast path
+    // clears this timer immediately in the finally.
+    const safety = setTimeout(() => setLoading(false), 2000);
+
     // Load initial session — swallow errors so a stale/invalid session never
     // surfaces as an unhandled rejection (which freezes the dev error overlay).
-    // `loading` flips false only once this initial check (incl. the profile
-    // load) has settled, so consumers can hold the greeting until then.
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
         if (session?.user) await loadProfile(session.user);
       })
       .catch(() => { setUser(null); setSupabaseUser(null); })
-      .finally(() => setLoading(false));
+      .finally(() => { clearTimeout(safety); setLoading(false); });
 
     // Listen for auth changes. Only clear the user on an explicit SIGNED_OUT —
     // a transient event without a session must NOT wipe a logged-in profile.
@@ -72,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(safety); subscription.unsubscribe(); };
   }, []);
 
   async function loadProfile(sbUser: User) {
