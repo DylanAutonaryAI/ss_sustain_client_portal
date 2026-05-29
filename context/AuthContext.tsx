@@ -18,6 +18,9 @@ export interface MockUser {
 interface AuthContextValue {
   user: MockUser | null;
   supabaseUser: User | null;
+  // True until the FIRST auth check (getSession + profile load) completes, so
+  // UI can hold the name/greeting instead of flashing "there" on a hard reload.
+  loading: boolean;
   login: (role: UserRole) => void;
   logout: () => void;
   refreshProfile: () => Promise<void>;
@@ -26,6 +29,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   supabaseUser: null,
+  loading: true,
   login: () => {},
   logout: () => {},
   refreshProfile: async () => {},
@@ -38,16 +42,20 @@ function getInitials(name: string) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<MockUser | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
   useEffect(() => {
     // Load initial session — swallow errors so a stale/invalid session never
     // surfaces as an unhandled rejection (which freezes the dev error overlay).
+    // `loading` flips false only once this initial check (incl. the profile
+    // load) has settled, so consumers can hold the greeting until then.
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
         if (session?.user) await loadProfile(session.user);
       })
-      .catch(() => { setUser(null); setSupabaseUser(null); });
+      .catch(() => { setUser(null); setSupabaseUser(null); })
+      .finally(() => setLoading(false));
 
     // Listen for auth changes. Only clear the user on an explicit SIGNED_OUT —
     // a transient event without a session must NOT wipe a logged-in profile.
@@ -146,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, supabaseUser, login, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, supabaseUser, loading, login, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

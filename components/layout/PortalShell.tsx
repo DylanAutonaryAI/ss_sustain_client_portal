@@ -18,7 +18,7 @@ const pageViewInFlight = new Set<string>();
 // this handles the client-only concerns: the onboarding gate, activity stamping,
 // and per-section view tracking.
 export default function PortalShell({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   // Hold portal content until the onboarding gate is checked, so an un-onboarded
@@ -85,7 +85,10 @@ export default function PortalShell({ children }: { children: React.ReactNode })
     );
   }, [pathname]);
 
-  if (!gateChecked) {
+  // Hold portal content until BOTH the onboarding gate is checked AND the auth
+  // profile has loaded — so the name/greeting never flashes "there" on a hard
+  // reload (auth resolves a beat after the page first paints).
+  if (!gateChecked || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
         <span className="text-[13px]" style={{ color: 'var(--text3)' }}>Loading…</span>
