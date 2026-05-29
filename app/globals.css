@@ -107,6 +107,18 @@ body {
    containing block for fixed-position modals). A touch longer so it registers. */
 .animate-page       { animation: fadeIn 0.28s ease-out both; }
 
+/* floating chat widget — grow in / shrink out from the bottom-right launcher corner */
+@keyframes chatPanelIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.92); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+@keyframes chatPanelOut {
+  from { opacity: 1; transform: translateY(0)   scale(1); }
+  to   { opacity: 0; transform: translateY(8px) scale(0.92); }
+}
+.animate-chat-open  { transform-origin: 100% 100%; animation: chatPanelIn  0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-chat-close { transform-origin: 100% 100%; animation: chatPanelOut 0.16s ease-in both; }
+
 /* ── Login splash — Sam's logo swooshes into centre on a white screen (Twitch-style) ── */
 @keyframes splashSwoosh {
   0%   { transform: translateX(-55vw) scale(0.7) rotate(-4deg); opacity: 0; filter: blur(12px); }

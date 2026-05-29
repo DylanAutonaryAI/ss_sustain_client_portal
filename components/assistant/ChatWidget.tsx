@@ -80,6 +80,7 @@ export default function ChatWidget() {
 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -162,6 +163,19 @@ export default function ChatWidget() {
     }
   }, [messages, streaming, buildCatalog, user, statusLabel]);
 
+  // Any close = full wipe. Re-opening always starts a brand-new chat.
+  const closeChat = useCallback(() => {
+    setOpen(false);
+    setMessages([]);
+    setInput('');
+    try { sessionStorage.removeItem(STORE_MSGS); } catch { /* ignore */ }
+  }, []);
+
+  // Play the exit animation first (panel stays mounted), then finishClose runs
+  // the full wipe when the close keyframe ends. beginClose is idempotent.
+  const beginClose = useCallback(() => { setClosing(true); }, []);
+  const finishClose = useCallback(() => { setClosing(false); closeChat(); }, [closeChat]);
+
   if (!mounted) return null;
 
   const firstName = user?.name?.split(' ')[0] || 'there';
@@ -170,7 +184,7 @@ export default function ChatWidget() {
     && messages[messages.length - 1].content === '';
 
   // ─── Launcher ───────────────────────────────────────────────────────────────
-  if (!open) {
+  if (!open && !closing) {
     return (
       <button
         onClick={() => setOpen(true)}
@@ -192,7 +206,11 @@ export default function ChatWidget() {
 
   return (
     <div
-      className="fixed bottom-5 right-5 z-[70] flex flex-col overflow-hidden"
+      className={`fixed bottom-5 right-5 z-[70] flex flex-col overflow-hidden ${closing ? 'animate-chat-close' : 'animate-chat-open'}`}
+      onAnimationEnd={(e) => {
+        if (e.target !== e.currentTarget) return;          // ignore bubbled child animations (e.g. typing dots)
+        if (e.animationName === 'chatPanelOut') finishClose();
+      }}
       style={{
         width: 'min(380px, calc(100vw - 2rem))',
         height: 'min(600px, calc(100vh - 2.5rem))',
@@ -216,7 +234,7 @@ export default function ChatWidget() {
           <div className="text-[11px] text-white/80 leading-tight">Your portal guide · replies instantly</div>
         </div>
         <button
-          onClick={() => setOpen(false)}
+          onClick={beginClose}
           aria-label="Close assistant"
           className="w-7 h-7 rounded-full flex items-center justify-center text-white transition-colors"
           style={{ background: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
@@ -259,7 +277,7 @@ export default function ChatWidget() {
           const isStreamingThis = i === messages.length - 1 && lastIsEmptyAssistant;
           return (
             <div key={i} className={`${bubbleBase} self-start`} style={{ background: 'var(--bg2)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-              {isStreamingThis ? <Dots /> : <Rich text={m.content} onNavigate={() => setOpen(false)} />}
+              {isStreamingThis ? <Dots /> : <Rich text={m.content} onNavigate={finishClose} />}
             </div>
           );
         })}
