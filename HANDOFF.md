@@ -15,23 +15,25 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-29) — auth "Hello there" cracked; SITE LIVE ✅
-**`app.sssustain.com` is live and stable** (login both roles, onboarding gate, profile,
-real client invite end-to-end). Since the last note we: rotated the `service_role` key
-(migrated to the new Supabase API keys, legacy JWT keys disabled), **fixed the recurring
-"Good morning, there." / no-name bug** (root-caused via a multi-agent workflow — see
-Recently done), **reinstated server-side route protection** (server-component guards, no
-edge middleware), **fixed the invite redirect** (trailing-slash), and **widened the meal
-tracker** to fill the screen. Operationally the user has **run both pending SQLs**
-(`tracker`, `client_status_reason`), **verified the Resend domain**, and **set
-`ANTHROPIC_API_KEY`** in Vercel. Latest commit `5420ea4`.
+## 📌 Latest handoff note (2026-05-29 — laptop) — notifications now server-backed
+**Sidebar notification badges moved off localStorage onto Supabase.** The old system
+(`ss-seen-v1` per-browser) re-lit every badge on logout, refresh, or a different machine
+because the "seen" state never left the browser. New design: a `notification_seen` table
+(user × section_key → `seen_ids[]`) read/written via a new service-role route
+(`/api/notifications/seen`). Once a user clicks a section, badges stay cleared **across
+every device, forever**, until a genuinely new id appears. First-load behavior is
+**"start clean"** — current items auto-seed as seen on first encounter, so a brand-new
+account does NOT show a wall of badges. **Run `db/2026-05-29_notification_seen.sql`
+before pushing — until then the route 500's and the badge system silently falls back to
+all-zero.**
 
 ⚠️ **Carry-forward before go-live (see Watch out):**
-1. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
+1. **Run `db/2026-05-29_notification_seen.sql`** (this session's migration — see Active).
+2. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
    button — last-minute, do at go-live.
-2. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
+3. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
-3. **Confirm refresh-token health under the new keys** — the "there" fix populates the
+4. **Confirm refresh-token health under the new keys** — the "there" fix populates the
    profile from the server reliably, but if `grant_type=refresh_token` is genuinely broken
    (vs a stranded pre-migration session), browser sessions still can't auto-extend past the
    access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
@@ -42,17 +44,22 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 
 ---
 
-## 🔴 Active — in progress right now
-**Nothing in active development right now.** The portal is functionally complete, secured,
-and live on `main`. Both pending SQLs are run, the Resend domain is verified, the
-`service_role` key is rotated, `ANTHROPIC_API_KEY` is set, route protection is back, and the
-auth "there" bug is fixed (see Recently done). What's left is **operational / external:**
-- **At go-live:** flip `ONBOARDING_TEST_MODE` → false + remove the admin skip button.
-- **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only onboarding blocker.
-- **Verify refresh-token health** under the new keys (see carry-forward #3 above) — a clean
-  re-login + a Network check settles whether long sessions auto-extend.
-- **Smoke-test worth doing** now everything's wired: fresh client invite → onboarding →
-  log a meal / night out → coach sees it in the roster (+ Reset) → test the AI assistant.
+## 🔴 Active — pending SQL only
+**Notification badges → Supabase (built; gated on running ONE migration).**
+- Problem: badges popped back on logout / refresh / a new machine. Root cause: "seen"
+  state lived only in this browser's `localStorage` (`ss-seen-v1`), unscoped per user.
+- Fix (this session): `notification_seen` table, per `(user_id, section_key)` →
+  `seen_ids text[]`. New route `app/api/notifications/seen/route.ts` (GET map / POST
+  upsert one section), service-role + cookie-validated `user.id`, same pattern as
+  `tracker`. `lib/notifications.ts` refactored to be DB-backed: fetches the map on
+  mount, marks fire-and-forget POST. "Start clean" semantics — a section that has no
+  row yet auto-seeds to its current ids, so first login is NOT a wall of badges; badges
+  only ever light when a NEW id appears. Sidebars unchanged (same hooks).
+- **Action required: run `db/2026-05-29_notification_seen.sql` in Supabase** before
+  pushing. The route is service-role + RLS-locked; without the table the GET 500's and
+  badges fall back to "always 0" (no harm, but the feature doesn't work).
+- Smoke-test after the SQL: click a section → refresh → badge stays cleared; sign out
+  → sign back in → still cleared; sign in on a second device → still cleared.
 
 ---
 
@@ -102,6 +109,29 @@ auth "there" bug is fixed (see Recently done). What's left is **operational / ex
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-29 (laptop) — Sidebar notifications moved off localStorage onto Supabase.**
+  Old system: `lib/notifications.ts` stored "seen item ids" in `localStorage` under
+  `ss-seen-v1`, per browser, unscoped per user → badges re-lit on logout, refresh, or a
+  different machine (each new browser had no record, so every item counted as new).
+  - **DB:** `db/2026-05-29_notification_seen.sql` — `notification_seen(user_id,
+    section_key, seen_ids text[], updated_at)` primary key `(user_id, section_key)`,
+    RLS locked. **⚠️ NOT YET RUN IN SUPABASE — see Watch out.**
+  - **Route:** `app/api/notifications/seen/route.ts` — GET returns the user's whole
+    map; POST upserts one section's `seen_ids`. Cookie session validated via
+    `auth.getUser()`, all reads/writes via the service-role admin client scoped to
+    `user.id`. (Same pattern as `tracker/me`, `onboarding/me`.)
+  - **Lib:** `lib/notifications.ts` refactored. In-memory store backed by a one-time
+    GET on first use; `markSeen` updates the cache + fire-and-forget POST. Hooks
+    (`useUnseenCounts`, `useMarkActiveSeen`) keep their old signatures, so the
+    sidebars didn't need to change. Until the GET resolves, counts return 0 so we
+    never flash "everything new" before we know what's been seen.
+  - **First-load semantics ("start clean", Dylan's choice):** a section with no DB row
+    yet auto-seeds to its current ids the moment they're available — a brand-new
+    account sees NO badges on day one. Badges only ever light for items added LATER.
+    For sections with async-loading data (referrals, content contexts) the seed waits
+    until ids are non-null/non-empty, so an empty fetch doesn't "lock in" emptiness.
+  - **Logout no longer needs to clear it** — there's no per-browser state to nuke. The
+    abandoned `ss-seen-v1` localStorage key from old sessions is harmless and unused.
 - **2026-05-29 — Auth "Good morning, there." / no-name bug CRACKED + route protection back.**
   The recurring bug: a logged-in client rendered the null-user fallbacks ("there",
   sidebar "Client"/"Active client"/"??") even though the server session was valid (Settings
@@ -413,8 +443,8 @@ auth "there" bug is fixed (see Recently done). What's left is **operational / ex
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
 - **All migrations applied ✅:** `onboarding_progress`, `page_views`, `referral`,
   `last_login`, `client_program_start`, **`client_status_reason` (run 2026-05-29)**, and
-  **`tracker` (run 2026-05-29)**. If Vercel ever points at a *different* Supabase than local
-  `.env.local`, re-run them there.
+  **`tracker` (run 2026-05-29)**. **⚠️ `notification_seen` NOT YET RUN — see Active.** If
+  Vercel ever points at a *different* Supabase than local `.env.local`, re-run them there.
 - **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
   If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
   — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
@@ -427,4 +457,4 @@ auth "there" bug is fixed (see Recently done). What's left is **operational / ex
 
 ---
 
-**Last updated:** 2026-05-29 — auth "Good morning, there." bug cracked (load profile from `/api/me`, never block on the browser refresh) + server-side route protection reinstated + invite redirect fixed + tracker full-width. Both SQLs run, Resend domain verified, `ANTHROPIC_API_KEY` set, `service_role` rotated. Open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
+**Last updated:** 2026-05-29 (laptop) — sidebar notifications moved off localStorage onto Supabase (`notification_seen` table + `/api/notifications/seen` route); first-load is "start clean" (seed current ids as seen). **One pending action before this works in prod: run `db/2026-05-29_notification_seen.sql`.** Still open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
