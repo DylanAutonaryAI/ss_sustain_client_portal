@@ -1,28 +1,17 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import CoachShell from '@/components/layout/CoachShell';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import CoachSidebar from '@/components/layout/CoachSidebar';
+// Server-side route protection (Node runtime, not edge — see app/portal/layout.tsx
+// for why). Hard gate: no session → /login; a client hitting the coach dashboard
+// → their portal.
+export default async function CoachLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
 
-export default function CoachLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const router = useRouter();
+  const { data: role } = await supabase.rpc('get_my_role');
+  if (role === 'client') redirect('/portal/home');
 
-  // Only redirect a logged-in CLIENT away to their portal. Do NOT bounce on a
-  // null `user` while the auth profile is still loading — that's what made coach
-  // login flash the dashboard then reset to /login (stale `ss-user` key is gone).
-  // Auth is enforced by the API routes; full route protection is reinstated separately.
-  useEffect(() => {
-    if (user?.role === 'client') router.push('/portal/home');
-  }, [user, router]);
-
-  return (
-    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
-      <CoachSidebar />
-      <main className="flex-1 min-h-screen" style={{ marginLeft: '220px' }}>
-        {children}
-      </main>
-    </div>
-  );
+  return <CoachShell>{children}</CoachShell>;
 }
