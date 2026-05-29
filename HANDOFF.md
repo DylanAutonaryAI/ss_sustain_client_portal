@@ -15,21 +15,27 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-28) — tracker + assistant shipped; SITE LIVE ✅
-**`app.sssustain.com` is live and stable** (login both roles, onboarding gate, profile).
-The 2026-05-28 sessions shipped the **social/meal tracker** (per-client, coach-visible),
-a **client AI assistant**, **sound effects + login splash**, and a batch of fixes
-(community calendar now clickable, sidebar sign-out clipping, per-client tracker reset,
-clickable overview "recent clients"). All on `main` (auto-deploys). Latest commit `ba84f33`.
+## 📌 Latest handoff note (2026-05-29) — auth "Hello there" cracked; SITE LIVE ✅
+**`app.sssustain.com` is live and stable** (login both roles, onboarding gate, profile,
+real client invite end-to-end). Since the last note we: rotated the `service_role` key
+(migrated to the new Supabase API keys, legacy JWT keys disabled), **fixed the recurring
+"Good morning, there." / no-name bug** (root-caused via a multi-agent workflow — see
+Recently done), **reinstated server-side route protection** (server-component guards, no
+edge middleware), **fixed the invite redirect** (trailing-slash), and **widened the meal
+tracker** to fill the screen. Operationally the user has **run both pending SQLs**
+(`tracker`, `client_status_reason`), **verified the Resend domain**, and **set
+`ANTHROPIC_API_KEY`** in Vercel. Latest commit `5420ea4`.
 
-⚠️ **Carry-forward before real clients / go-live (see Watch out):**
-1. **Run `db/2026-05-28_tracker.sql`** in Supabase — the tracker has no table yet, so
-   setup/logging fails and the coach summary is empty until it's applied.
-2. **Run `db/2026-05-27_client_status_reason.sql`** — still not verified.
-3. **Set `ANTHROPIC_API_KEY`** in Vercel — the AI assistant returns a 503 without it.
-4. **Rotate the `service_role` key** (it appeared in screenshots while debugging).
-5. **Flip `ONBOARDING_TEST_MODE` → false** + remove the admin skip button at go-live.
-6. **Reinstate server-side route protection** (edge middleware was removed).
+⚠️ **Carry-forward before go-live (see Watch out):**
+1. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
+   button — last-minute, do at go-live.
+2. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
+   onboarding go-live.
+3. **Confirm refresh-token health under the new keys** — the "there" fix populates the
+   profile from the server reliably, but if `grant_type=refresh_token` is genuinely broken
+   (vs a stranded pre-migration session), browser sessions still can't auto-extend past the
+   access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
+   `POST /auth/v1/token?grant_type=refresh_token` (should be 2xx) confirms it.
 
 Deploys go to **`main`** (we push `master:main`). Workflow: `git pull` at start → work in
 ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
@@ -37,15 +43,16 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 ---
 
 ## 🔴 Active — in progress right now
-**Nothing in active development right now.** The 2026-05-28 sessions shipped the meal
-tracker, the AI assistant, sound effects, and a batch of fixes — all live on `main`
-(see Recently done). What's left is **operational, not code:**
-- **Run `db/2026-05-28_tracker.sql`** in Supabase, then smoke-test the meal-tracker
-  round-trip: client sets up → logs a meal / night out → coach opens that client's roster
-  row and sees it (and can hit **Reset tracker** to wipe that client's data).
-- **Set `ANTHROPIC_API_KEY`** in Vercel so the client AI assistant answers (it returns a
-  graceful 503 until then), then test it from a client login.
-- **Onboarding go-live** — still gated on Sam's 2 Loom videos (detail below).
+**Nothing in active development right now.** The portal is functionally complete, secured,
+and live on `main`. Both pending SQLs are run, the Resend domain is verified, the
+`service_role` key is rotated, `ANTHROPIC_API_KEY` is set, route protection is back, and the
+auth "there" bug is fixed (see Recently done). What's left is **operational / external:**
+- **At go-live:** flip `ONBOARDING_TEST_MODE` → false + remove the admin skip button.
+- **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only onboarding blocker.
+- **Verify refresh-token health** under the new keys (see carry-forward #3 above) — a clean
+  re-login + a Network check settles whether long sessions auto-extend.
+- **Smoke-test worth doing** now everything's wired: fresh client invite → onboarding →
+  log a meal / night out → coach sees it in the roster (+ Reset) → test the AI assistant.
 
 ---
 
@@ -95,6 +102,60 @@ tracker, the AI assistant, sound effects, and a batch of fixes — all live on `
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-29 — Auth "Good morning, there." / no-name bug CRACKED + route protection back.**
+  The recurring bug: a logged-in client rendered the null-user fallbacks ("there",
+  sidebar "Client"/"Active client"/"??") even though the server session was valid (Settings
+  still showed the full profile). Root-caused with a **5-agent diagnostic workflow** (4
+  lenses + adversarial synthesis), high confidence:
+  - The browser's `getSession()` takes a **token-refresh** path on load; after the API-key
+    migration (legacy JWT keys disabled) that `POST /token?grant_type=refresh_token` is
+    rejected → auth-js returns `{session:null}` AND wipes the cookie → `loadProfile` never
+    ran → `user` null. The SERVER `getUser()` only *validates* the still-valid access token
+    (no refresh), so the route guard passed — the server-valid / client-null split. Worse,
+    `AuthContext` *awaited* the browser `getUser()`, which can **hang** on that stalled
+    refresh, so the fallback never ran (persistent, not just intermittent).
+  - **The Settings clue:** `/api/profile` works because it validates via `getUser()` but
+    reads the profile with the **service-role (admin)** client. So the cookie session is
+    fine — only the browser-session read path was failing.
+  - **Fix (commits `c848771` → `5420ea4`):** new **`app/api/me/route.ts`** returns the
+    cookie-validated identity, reading the profile via the **admin client** (like
+    `/api/profile`). `context/AuthContext.tsx` now populates `user` from `/api/me` **first**
+    and NEVER blocks on the hangable browser `getUser()` (it only fills `supabaseUser`
+    opportunistically). `refreshProfile` uses `/api/me` too. `onAuthStateChange` re-checks
+    `/api/me` before honoring `SIGNED_OUT`, so a failed *background* refresh can't wipe a
+    still-valid session. Login/auth pages skip the recovery (don't contend with
+    `signInWithPassword`). Also added a 2s safety cap on the loading gate.
+  - **⚠️ Underlying caveat:** this makes the *display* reliable, but if the refresh grant is
+    genuinely broken under the new keys, long sessions still can't auto-extend — see
+    carry-forward #3.
+- **2026-05-29 — Server-side route protection REINSTATED** (commit `f9e7630`).
+  `app/portal/layout.tsx` + `app/coach/layout.tsx` are now **server components** that
+  validate the session from cookies (`getUser` + `get_my_role`) and `redirect()` BEFORE any
+  content renders — no session → `/login`, wrong role → their own home. Runs in the **Node
+  runtime** (not edge), so it sidesteps the `MIDDLEWARE_INVOCATION_FAILED` crash that forced
+  `middleware.ts` out. The client logic (onboarding gate, view tracking, role bounce) moved
+  into `PortalShell`/`CoachShell`.
+- **2026-05-29 — Invite redirect fixed** (commit `a4135c2`). A trailing slash in
+  `NEXT_PUBLIC_SITE_URL` produced `…com//auth/callback`, which failed Supabase's redirect
+  allow-list and dumped the invited client on `/login`. `app/api/invite-client/route.ts` now
+  strips the trailing slash. (Also: Supabase URL config has Site URL + `…/**` allow-listed;
+  invite tokens are single-use, so re-add the client for a fresh link.) Real client invite
+  now works end-to-end (Resend domain verified, sender on `sssustain.com`).
+- **2026-05-29 — Meal tracker fills the screen** (commits `015de4e`, `502f9aa`).
+  `app/portal/tracker/page.tsx` was locked to a 620px column; every tab now uses the full
+  ~1040px width in a two-column layout (This Week / Settings / Log Meal / Night Out), still
+  stacking to one column on small screens. Tab bar stays centered; Recovery screen stays
+  narrow (prose).
+- **2026-05-29 — Chat widget polish** (commit `59a6b37`, parallel session): animate
+  open/close + reset the conversation on close.
+- **2026-05-29 — `service_role` key rotated; leak CLOSED.** Migrated off legacy JWT keys to
+  the new Supabase API keys (`sb_publishable_…` anon, `sb_secret_…` service role) in Vercel +
+  local `.env.local`; legacy keys disabled and the old leaked key verified dead (`401`).
+  (See Watch out for the env-var specifics.)
+- **2026-05-29 — Operational, done by Dylan:** ran `db/2026-05-28_tracker.sql` and
+  `db/2026-05-27_client_status_reason.sql` in Supabase; verified the **Resend domain**
+  (`sssustain.com`) so invites reach real clients; set **`ANTHROPIC_API_KEY`** in Vercel
+  (redeploy + test the assistant from a client login to confirm it answers).
 - **2026-05-28 — Social / meal tracker BUILT & shipped (per-client, coach-visible).**
   Sam's standalone HTML tracker rebuilt natively in the portal so it's per-client and Sam
   can see engagement. Commits `6ff3487` (build) + `ea19a80` (reset + overview link).
@@ -299,60 +360,71 @@ tracker, the AI assistant, sound effects, and a batch of fixes — all live on `
   logout/AuthProvider hardening.
 
 ## ⏭️ Still to do
-- **Reinstate server-side route protection** — `middleware.ts` was deleted after edge
-  500s. Today protection is client-side only (layouts) + API 401s. Re-add once the edge
-  `MIDDLEWARE_INVOCATION_FAILED` cause is understood (or do it without edge middleware).
-- **Social / meal tracker — BUILT & shipped (see Recently done).** Run
-  `db/2026-05-28_tracker.sql`, then smoke-test the client→coach round-trip. Possible
-  follow-ups Sam may want: email/WhatsApp nudges on streaks or no-logs, a coach-side "who
-  logged this week" summary on the overview.
-- **AI assistant — set `ANTHROPIC_API_KEY` in Vercel** (Production, Sensitive) so it
-  actually answers; it's client-gated and 503s until then. Then test from a client login.
-  Future: feed it more SS Sustain knowledge in `lib/assistant/knowledge.ts`.
+- **At go-live: flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the
+  admin skip button (`app/onboarding/page.tsx`). Last-minute; until then the gate shows every
+  login + a prod skip button (for testing).
 - **Onboarding go-live** — only Gate 2 left: Sam's **welcome video** + **portal walkthrough**
   Loom URLs (the SQL is applied). Then optionally wire the completion email to Sam.
-- **Resend domain verification** — until done, invite emails only reach the Resend account
-  owner, so a real client can't be onboarded end-to-end. Dashboard task, not code.
+- **Confirm refresh-token health under the new API keys.** The "there" fix made the profile
+  display reliable, but verify `POST /auth/v1/token?grant_type=refresh_token` returns 2xx
+  after a clean re-login. If it 4xx's (`invalid_grant`), the JWT *signing* keys may need
+  attention in the Supabase dashboard — otherwise browser sessions can't auto-extend past the
+  ~1h access-token lifetime and clients get silently logged out.
+- **AI assistant** — `ANTHROPIC_API_KEY` is set; redeploy (if not already) and test from a
+  client login. Future: feed it more SS Sustain knowledge in `lib/assistant/knowledge.ts`.
+- **Meal tracker follow-ups** Sam may want: email/WhatsApp nudges on streaks or no-logs; a
+  coach-side "who logged this week" summary on the overview.
 - Optional: split a longer-term **goal** from the **phase** if Sam wants both —
   the top-bar currently uses the `goal` field as the phase.
 
 ## ⚠️ Watch out
-- **🔑 ROTATE the `service_role` key.** It was visible in screenshots while debugging the
-  Vercel env vars. Supabase → Settings → API → roll the `service_role` key, then update
-  `SUPABASE_SERVICE_ROLE_KEY` in Vercel (Value field, Sensitive ON, Production) **and**
-  local `.env.local`, then redeploy. Do this before real client data is in.
+- **✅ `service_role` key rotated (2026-05-29) — leak CLOSED.** The key was visible in
+  screenshots during Vercel debugging. Fixed by migrating off the legacy JWT keys to the
+  new Supabase API keys: `SUPABASE_SERVICE_ROLE_KEY` is now an `sb_secret_…` key and
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` an `sb_publishable_…` key (both updated in Vercel + local
+  `.env.local`), and the **legacy JWT keys are now disabled**. Verified the old leaked key
+  is dead — REST + auth both return `401`. **Do NOT re-enable legacy keys.**
 - **Deploys go to the `main` branch, not `master`.** Vercel's production branch is `main`.
   We push `master:main` each deploy. To go live, code must reach `main`. (Cleaner: set
   Vercel's production branch back to `master` in Settings → Git/Environments, delete `main`.)
 - **Vercel env vars (production):** the two `NEXT_PUBLIC_*` keys must be **NON-sensitive**
-  (or they won't reach the browser → logins break). `SUPABASE_SERVICE_ROLE_KEY` must be the
-  real `service_role` key (role `service_role`) in the **Value** field. **Framework Preset
-  must stay "Next.js"** (if it flips to "Other", every page 404s).
+  (or they won't reach the browser → logins break). Keys are now the **new Supabase API
+  keys** (legacy JWT keys disabled): `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_…`,
+  `SUPABASE_SERVICE_ROLE_KEY` = `sb_secret_…` (Sensitive, server-only) in the **Value**
+  field. **Framework Preset must stay "Next.js"** (if it flips to "Other", every page 404s).
 - **`ONBOARDING_TEST_MODE = true`** (`lib/onboarding.ts`) forces onboarding on every login +
   shows the admin skip button **in production** (for testing). **Set it `false` at go-live.**
 - **Browser auth uses a no-op `lock`** (`lib/supabase/client.ts`) — both `navigator.locks`
   and `processLock` deadlocked `getSession()`. Don't re-introduce a blocking lock.
 - **No edge middleware** — `middleware.ts` was removed (it 500'd the whole site). Don't
   re-add an edge middleware without solving `MIDDLEWARE_INVOCATION_FAILED` first, or the
-  site goes down. Route protection is currently client-side only.
+  site goes down. **Route protection is now reinstated server-side** via the
+  `app/portal/layout.tsx` + `app/coach/layout.tsx` **server components** (Node runtime,
+  `getUser` + `get_my_role` + `redirect`), NOT edge middleware — keep it that way.
+- **Auth/profile loads from `/api/me` (server, admin read) — do NOT make AuthContext depend
+  on the browser `getSession()`/`getUser()` for the initial profile.** That browser path
+  triggers a token refresh that can fail/hang under the new keys, which caused the
+  "Good morning, there." bug. `context/AuthContext.tsx` populates `user` from `/api/me`
+  first; `/api/me` reads the profile with the service-role client. If you refactor auth,
+  preserve this — and `loadProfile`/`refreshProfile` must never null a logged-in user on a
+  transient/refresh error.
 - **Page transitions must stay opacity-only.** `template.tsx` uses `animate-page` (fade,
   no transform). A `transform` on those wrappers becomes the containing block for any
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
-- **Applied ✅ (verified by query):** `db/2026-05-27_onboarding_progress.sql`,
-  `db/2026-05-27_page_views.sql`, `db/2026-05-27_referral.sql`, and `last_login`.
-  If Vercel ever points at a *different* Supabase than local `.env.local`, re-run them there.
-- **`db/2026-05-27_client_status_reason.sql` — RUN IN SUPABASE (not yet verified).** Adds
-  `status_reason` + `status_note` to `clients` for the new Paused/Cancelled reasons. Until
-  applied, saving a Paused/Cancelled client errors. (If a CHECK constraint blocks the
-  'Cancelled' value, drop it — see the note in the SQL file.)
-- **`db/2026-05-28_tracker.sql` — RUN IN SUPABASE (not yet applied).** Creates
-  `tracker_profiles` + `tracker_logs` for the meal tracker. Until applied, the tracker
-  page can't save setup or log meals, and the coach's roster TrackerSummary shows empty.
-- **AI assistant needs `ANTHROPIC_API_KEY`** (Vercel → Production, Sensitive; server-only).
-  Without it `app/api/assistant` returns a 503 and the chat says it's "not set up yet."
-- Invite emails: Resend sandbox sender only reaches the Resend account owner until a
-  domain is verified in Resend + the Supabase SMTP "from" is updated.
+- **All migrations applied ✅:** `onboarding_progress`, `page_views`, `referral`,
+  `last_login`, `client_program_start`, **`client_status_reason` (run 2026-05-29)**, and
+  **`tracker` (run 2026-05-29)**. If Vercel ever points at a *different* Supabase than local
+  `.env.local`, re-run them there.
+- **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
+  If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
+  — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
+- **Invite emails work** — the Resend **domain `sssustain.com` is verified** and the Supabase
+  SMTP sender is on that domain, so invites reach real clients (not just the Resend account
+  owner). Invite tokens are single-use; re-add a client to get a fresh link.
+- **Refresh-token health (open):** verify `POST /auth/v1/token?grant_type=refresh_token`
+  returns 2xx after a clean re-login under the new keys. If it 4xx's, browser sessions can't
+  auto-extend past ~1h — see Still to do.
 
 ---
 
-**Last updated:** 2026-05-28 — meal tracker + AI assistant + sound effects shipped; community calendar clickable; sidebar sign-out clipping fixed. Gates: run `db/2026-05-28_tracker.sql`, set `ANTHROPIC_API_KEY`.
+**Last updated:** 2026-05-29 — auth "Good morning, there." bug cracked (load profile from `/api/me`, never block on the browser refresh) + server-side route protection reinstated + invite redirect fixed + tracker full-width. Both SQLs run, Resend domain verified, `ANTHROPIC_API_KEY` set, `service_role` rotated. Open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
