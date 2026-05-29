@@ -69,27 +69,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loadProfile(sbUser: User) {
     setSupabaseUser(sbUser);
-    try {
-      const { data: role } = await supabase.rpc('get_my_role');
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', sbUser.id)
-        .single();
+    const fallbackName = sbUser.email?.split('@')[0] || 'User';
 
-      const name = profile?.full_name || sbUser.email?.split('@')[0] || 'User';
-      setUser({
-        role: (role as UserRole) ?? 'client',
-        name,
-        initials: getInitials(name),
-        avatarUrl: profile?.avatar_url || undefined,
-        nickname: profile?.nickname || undefined,
-      });
-    } catch {
-      // Session is present but unusable (e.g. revoked) — treat as logged out.
-      setUser(null);
-      setSupabaseUser(null);
-    }
+    // Resolve role + profile INDEPENDENTLY and defensively. loadProfile runs
+    // concurrently (getSession + onAuthStateChange), so a transient failure on
+    // either query must never blank the user back to null — that race is what
+    // made a logged-in client intermittently flash "Hello there". Worst case we
+    // fall back to the email name + the previously-known role; real logout is
+    // handled by the SIGNED_OUT event, not by a query error here.
+    let resolvedRole: UserRole | null = null;
+    try {
+      const { data } = await supabase.rpc('get_my_role');
+      if (data === 'coach' || data === 'client') resolvedRole = data;
+    } catch { /* transient — keep going */ }
+
+    let profile: { full_name?: string | null; avatar_url?: string | null; nickname?: string | null } | null = null;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url, nickname')
+        .eq('id', sbUser.id)
+        .maybeSingle();
+      profile = data;
+    } catch { /* transient — keep going */ }
+
+    const name = profile?.full_name || fallbackName;
+    setUser((prev) => ({
+      role: resolvedRole ?? prev?.role ?? 'client',
+      name,
+      initials: getInitials(name),
+      avatarUrl: profile?.avatar_url || undefined,
+      nickname: profile?.nickname || undefined,
+    }));
   }
 
   // Re-read the profile for the current session (call after a settings save so
