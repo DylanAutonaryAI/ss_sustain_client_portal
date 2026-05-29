@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 // Server-validated identity for the client AuthContext. The SERVER getUser()
 // validates the access token from the cookie session against the Auth API — it
@@ -13,9 +13,14 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ user: null });
 
+  // Read the profile via the ADMIN (service-role) client, exactly like the
+  // working /api/profile route — so this never depends on a user-session RLS
+  // read (which is the path that fails after the API-key migration). get_my_role
+  // is a security-definer RPC, so it's fine on the user client.
+  const admin = await createAdminClient();
   const [{ data: role }, { data: profile }] = await Promise.all([
     supabase.rpc('get_my_role'),
-    supabase.from('profiles').select('full_name, avatar_url, nickname').eq('id', user.id).maybeSingle(),
+    admin.from('profiles').select('full_name, avatar_url, nickname').eq('id', user.id).maybeSingle(),
   ]);
 
   return NextResponse.json({

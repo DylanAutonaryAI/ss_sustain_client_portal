@@ -87,6 +87,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // a short cap and render regardless; the user populates when it resolves.
     const safety = setTimeout(() => setLoading(false), 2000);
 
+    // Skip the initial recovery on the login / auth-callback pages. Those pages
+    // drive their own auth (signInWithPassword, token exchange); running a
+    // network getUser() here just contends with them on the shared client and
+    // can wedge "Signing in…". Nothing to recover on those routes anyway.
+    const path = typeof window !== 'undefined' ? window.location.pathname : '';
+    const onAuthPage = path === '/login' || path.startsWith('/auth');
+
     // Initial load. Use getUser() (validates the access token) rather than
     // getSession(), which triggers a client-side refresh-token grant on load —
     // and that refresh can fail after the API-key migration, returning a null
@@ -94,20 +101,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // "Good morning, there." If getUser() yields nothing, fall back to the
     // server (/api/me) — the same cookie-validated check the route guards pass —
     // so the profile loads even when the browser client can't read the session.
-    (async () => {
-      try {
-        const { data: { user: sbUser } } = await supabase.auth.getUser();
-        if (sbUser) { await loadProfile(sbUser); return; }
-        const me = await fetchMe();
-        if (me) setUser(me);
-      } catch {
-        const me = await fetchMe();
-        if (me) setUser(me); else { setUser(null); setSupabaseUser(null); }
-      } finally {
-        clearTimeout(safety);
-        setLoading(false);
-      }
-    })();
+    if (onAuthPage) {
+      clearTimeout(safety);
+      setLoading(false);
+    } else {
+      (async () => {
+        // Populate from the server (/api/me) FIRST. It validates the cookie
+        // session server-side and reads the profile via the service-role client
+        // — the same reliable path /api/profile (Settings) uses. Critically, we
+        // do NOT await the browser getUser() here: after the API-key migration
+        // that call can HANG on a stalled token refresh, which previously left
+        // the fallback unreached and the user stuck as "Good morning, there."
+        try {
+          const me = await fetchMe();
+          if (me) setUser(me); else { setUser(null); setSupabaseUser(null); }
+        } finally {
+          clearTimeout(safety);
+          setLoading(false);
+        }
+        // Fill in supabaseUser opportunistically, without blocking the profile.
+        supabase.auth.getUser()
+          .then(({ data: { user: sbUser } }) => { if (sbUser) setSupabaseUser(sbUser); })
+          .catch(() => {});
+      })();
+    }
 
     // Listen for auth changes. A FAILED background token refresh also fires
     // SIGNED_OUT, so before wiping the profile, re-check server-side: if the
@@ -168,13 +185,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }));
   }
 
-  // Re-read the profile for the current session (call after a settings save so
-  // the sidebar avatar / nickname update without a full reload).
+  // Re-read the profile after a settings save so the sidebar avatar / nickname
+  // update without a full reload. Uses the server route (reliable; immune to the
+  // browser's broken token refresh) rather than getSession()+loadProfile.
   const refreshProfile = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) await loadProfile(session.user);
-    } catch { /* ignore */ }
+    const me = await fetchMe();
+    if (me) setUser(me);
   };
 
   // Kept for backwards compatibility — not used in practice now
