@@ -39,6 +39,42 @@ function getInitials(name: string) {
   return name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
 }
 
+// Shape returned by GET /api/me (server-validated identity).
+interface MeResponse {
+  role?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  nickname?: string | null;
+}
+
+function buildMockUser(d: MeResponse): MockUser {
+  const name = d.full_name || d.email?.split('@')[0] || 'User';
+  return {
+    role: d.role === 'coach' || d.role === 'client' ? d.role : 'client',
+    name,
+    initials: getInitials(name),
+    avatarUrl: d.avatar_url || undefined,
+    nickname: d.nickname || undefined,
+  };
+}
+
+// Ask the server for the cookie-validated identity. The server's getUser()
+// validates the access token directly and never depends on the browser's
+// client-side refresh-token grant (which can fail after the API-key migration),
+// so this recovers the profile even when the browser client can't read/refresh
+// the session. Returns null only when the server agrees there's no session.
+async function fetchMe(): Promise<MockUser | null> {
+  try {
+    const res = await fetch('/api/me', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const { user } = await res.json();
+    return user ? buildMockUser(user) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<MockUser | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
@@ -46,32 +82,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
-    // Safety net: never let the initial auth check freeze the UI. The portal
-    // holds its "Loading…" state until `loading` is false, so if getSession or
-    // loadProfile is slow / hangs (a stalled network request can't be caught),
-    // flip it false after a short cap and render anyway — loadProfile keeps
-    // running and fills in the name when it resolves. The normal fast path
-    // clears this timer immediately in the finally.
+    // Safety net: never let the initial auth check freeze the UI (the portal
+    // holds its "Loading…" state until `loading` is false). Flip it false after
+    // a short cap and render regardless; the user populates when it resolves.
     const safety = setTimeout(() => setLoading(false), 2000);
 
-    // Load initial session — swallow errors so a stale/invalid session never
-    // surfaces as an unhandled rejection (which freezes the dev error overlay).
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
-        if (session?.user) await loadProfile(session.user);
-      })
-      .catch(() => { setUser(null); setSupabaseUser(null); })
-      .finally(() => { clearTimeout(safety); setLoading(false); });
+    // Initial load. Use getUser() (validates the access token) rather than
+    // getSession(), which triggers a client-side refresh-token grant on load —
+    // and that refresh can fail after the API-key migration, returning a null
+    // session AND wiping the cookie, which showed the logged-in client as
+    // "Good morning, there." If getUser() yields nothing, fall back to the
+    // server (/api/me) — the same cookie-validated check the route guards pass —
+    // so the profile loads even when the browser client can't read the session.
+    (async () => {
+      try {
+        const { data: { user: sbUser } } = await supabase.auth.getUser();
+        if (sbUser) { await loadProfile(sbUser); return; }
+        const me = await fetchMe();
+        if (me) setUser(me);
+      } catch {
+        const me = await fetchMe();
+        if (me) setUser(me); else { setUser(null); setSupabaseUser(null); }
+      } finally {
+        clearTimeout(safety);
+        setLoading(false);
+      }
+    })();
 
-    // Listen for auth changes. Only clear the user on an explicit SIGNED_OUT —
-    // a transient event without a session must NOT wipe a logged-in profile.
+    // Listen for auth changes. A FAILED background token refresh also fires
+    // SIGNED_OUT, so before wiping the profile, re-check server-side: if the
+    // access token still validates (/api/me returns a user), it was just a
+    // client refresh hiccup — keep the user. Only clear when the server agrees
+    // there's no session (a genuine sign-out clears the cookies, so /api/me
+    // returns null and we clear).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
         if (session?.user) {
           await loadProfile(session.user);
         } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setSupabaseUser(null);
+          const me = await fetchMe();
+          if (me) setUser(me);
+          else { setUser(null); setSupabaseUser(null); }
         }
       } catch {
         /* keep current state — don't wipe the profile on a transient error */
