@@ -24,20 +24,19 @@ with one click when the Brevo step is done. Built this session: pending state on
 access" pill + dedicated stat card + **Grant access & send invite** button on each
 pending row, and an **Add as pending** checkbox on the Add-client modal so Sam can
 manually create a pending client (Stripe will hit the same code path later via
-`/api/invite-client` with `pending: true`). **Run `db/2026-05-30_client_access.sql`**
-before this works in prod — until then, every existing client will look pending in the
-roster because the column doesn't exist yet.
+`/api/invite-client` with `pending: true`). **Migration `db/2026-05-30_client_access.sql`
+applied ✅ (2026-05-30) and adding clients from the roster verified working** — both the
+normal-invite path and the "Add as pending" path.
 
 ⚠️ **Carry-forward before go-live (see Watch out):**
-1. **Run `db/2026-05-30_client_access.sql`** (this session's migration — see Active).
-2. **Stripe webhook** — still to build. Hits `POST /api/invite-client` with
+1. **Stripe webhook** — still to build. Hits `POST /api/invite-client` with
    `pending: true` + the customer's email / name / plan-derived goal. Once wired up,
    purchase on the landing page → pending row appears in the roster automatically.
-3. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
+2. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
    button — last-minute, do at go-live.
-4. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
+3. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
-5. **Confirm refresh-token health under the new keys** — the "there" fix populates the
+4. **Confirm refresh-token health under the new keys** — the "there" fix populates the
    profile from the server reliably, but if `grant_type=refresh_token` is genuinely broken
    (vs a stranded pre-migration session), browser sessions still can't auto-extend past the
    access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
@@ -50,44 +49,18 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🔴 Active — pending SQL only
-**Pending-access flow (built; gated on running ONE migration).**
-- Goal: when a Stripe purchase lands or Sam manually adds a new client, they appear in
-  the roster as **pending** — NO invite email is sent. Sam runs his Brevo onboarding
-  outside the portal (Calendly call, signed-and-dated welcome pack); when done, he
-  presses **"Grant access & send invite"** on their row, which fires the Supabase
-  invite. The portal does NOT try to enforce trust-y self-attestation; Brevo + Sam's
-  click are the gate.
-- **DB:** `db/2026-05-30_client_access.sql` — adds `clients.access_granted_at
-  timestamptz` (NULL = pending) and backfills every existing row to `created_at` so
-  the current roster doesn't suddenly show as pending. **⚠️ NOT YET RUN IN SUPABASE.**
-- **Routes:**
-  - `POST /api/invite-client` — now accepts `{ pending: true }`. When true, skips
-    `inviteUserByEmail` entirely and inserts a `clients` row with `user_id: null`,
-    `access_granted_at: null`. Default behavior (no `pending` flag) is unchanged.
-  - `POST /api/clients/grant-access` — new route. Body `{ id }`. Sends the invite
-    email and stamps `access_granted_at = now()`. Idempotent (won't double-email
-    a click). Handles the "user already exists in auth" edge case by looking the
-    existing user up by email.
-- **Lib:** `lib/clients.ts` derives `pending = !access_granted_at` on each row and
-  overrides health/lastLogin for pending clients so they don't tank the churn
-  metrics before they can even log in.
-- **UI (`app/coach/clients/page.tsx`):**
-  - Stat row is now 5 cards (added **Pending access**, amber when > 0).
-  - Status column shows a yellow **"Pending access"** pill instead of the
-    Active/Paused/Cancelled pill while pending.
-  - Expanded row has a full-width amber banner with a primary **"Grant access &
-    send invite"** button — appears only for pending clients.
-  - Add-client modal has an **"Add as pending — no invite yet"** checkbox (amber
-    background when checked). Button label changes to "Add as pending" / "Adding…"
-    when set.
-- **Stripe webhook (NOT built yet):** the design is to call `/api/invite-client` with
-  `pending: true` + `{ email, full_name, goal, status }` derived from the
-  `checkout.session.completed` payload. Plan/payment details + the webhook signature
-  verification are a follow-up.
-- Smoke-test after the SQL: add a client with "Add as pending" → see it as Pending
-  access in the roster → open the row → press **Grant access** → invite email arrives
-  → they can set their password and sign in → pill flips to Active.
+## 🟢 Active — nothing actively in progress
+**Pending-access flow is DONE, live, and tested.** Migration applied 2026-05-30; adding
+clients from the roster confirmed working (normal-invite + "Add as pending"). Full
+breakdown moved to Recently done.
+
+**Next planned chunk (not started yet): the Stripe webhook.** A new
+`POST /api/stripe/webhook` that, on `checkout.session.completed`, calls the existing
+`/api/invite-client` with `pending: true` so a paid customer lands in the roster as
+**pending** automatically (Sam then does Brevo onboarding → "Grant access & send invite").
+Needs: the `stripe` package, a Stripe dashboard endpoint, and `STRIPE_SECRET_KEY` +
+`STRIPE_WEBHOOK_SECRET` env vars (start in Stripe **Test mode** with card `4242 4242 4242 4242`).
+Dylan has access to Sam's Stripe account; deferred for now.
 
 ---
 
@@ -151,12 +124,18 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
     domain** but **401 on the per-commit `*.vercel.app` preview URL** → frozen deploy, not
     a code bug. **Fix: switched the production branch to `master`** (see Watch out). This
     HANDOFF push is the first auto-deploy under the new setting.
-- **2026-05-30 — Pending-access flow built (foundation for Stripe → portal).** See Active
-  for the full breakdown. Tldr: `clients.access_granted_at` (nullable), new
-  `/api/clients/grant-access` route, `pending: true` flag on `/api/invite-client`,
-  amber "Pending access" pill + stat card + Grant button in the coach roster, Add-client
-  modal toggle. **Run `db/2026-05-30_client_access.sql` before this works in prod** —
-  without it the column doesn't exist and every existing row will look pending.
+- **2026-05-30 — Pending-access flow built, APPLIED & TESTED ✅ (foundation for Stripe → portal).**
+  Migration `db/2026-05-30_client_access.sql` run in Supabase 2026-05-30; adding clients from
+  the roster verified working (normal-invite + "Add as pending"). What it is:
+  `clients.access_granted_at` (nullable; NULL = pending); new `/api/clients/grant-access` route
+  (sends the invite + stamps the column, idempotent, handles "user already exists in auth");
+  `pending: true` flag on `/api/invite-client` (inserts a pending row with `user_id` /
+  `access_granted_at` null and sends NO email); `lib/clients.ts` derives
+  `pending = !access_granted_at` and shields pending clients from churn/health metrics; coach
+  roster UI (`app/coach/clients/page.tsx`): amber **"Pending access"** pill + 5th stat card +
+  full-width **"Grant access & send invite"** banner + Add-client **"Add as pending"** toggle.
+  Smoke path: Add as pending → Pending pill → open row → Grant access → invite arrives → client
+  sets password + signs in → pill flips to Active.
 - **2026-05-29 (laptop) — Sidebar notifications moved off localStorage onto Supabase.**
   Old system: `lib/notifications.ts` stored "seen item ids" in `localStorage` under
   `ss-seen-v1`, per browser, unscoped per user → badges re-lit on logout, refresh, or a
@@ -494,10 +473,9 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
   no transform). A `transform` on those wrappers becomes the containing block for any
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
 - **All migrations applied ✅:** `onboarding_progress`, `page_views`, `referral`,
-  `last_login`, `client_program_start`, `client_status_reason`, `tracker`, and
-  **`notification_seen` (run 2026-05-29)**. **⚠️ `client_access` NOT YET RUN — see
-  Active.** If Vercel ever points at a *different* Supabase than local `.env.local`,
-  re-run them there.
+  `last_login`, `client_program_start`, `client_status_reason`, `tracker`,
+  `notification_seen` (run 2026-05-29), and **`client_access` (run 2026-05-30)**. If Vercel
+  ever points at a *different* Supabase than local `.env.local`, re-run them there.
 - **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
   If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
   — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
@@ -510,4 +488,4 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-**Last updated:** 2026-05-30 — (1) Settings password change fixed (new `/api/profile/password` admin route + anti-hang client) AND root-caused the "fixes aren't taking" problem: **Vercel production branch was `main` while we push `master`, so deploys only made Preview builds — now switched to `master`, pushes auto-deploy to prod.** (2) Pending-access flow built earlier: `clients.access_granted_at` + `/api/clients/grant-access` + roster pending-pill / stat / Grant-button + Add-client "pending" toggle. **One pending action before that works in prod: run `db/2026-05-30_client_access.sql`.** Next chunk of work is the Stripe webhook (call `/api/invite-client` with `pending: true`). Still open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
+**Last updated:** 2026-05-30 — Pending-access flow **finished & shipped**: migration `db/2026-05-30_client_access.sql` **applied ✅** and adding clients from the roster verified working (normal-invite + "Add as pending"). Earlier this session: Settings password change fixed (new `/api/profile/password` admin route + anti-hang client), and root-caused why fixes weren't going live — **Vercel's production branch was `main` while we push `master`, so deploys only made Preview builds; now switched to `master`, pushes auto-deploy to prod.** Next chunk: the **Stripe webhook** (new `/api/stripe/webhook` → `/api/invite-client` with `pending: true`). Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
