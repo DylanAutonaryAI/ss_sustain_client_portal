@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Topbar from '@/components/layout/Topbar';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
 function getInitials(name: string) {
@@ -52,7 +51,6 @@ const btnPrimary: React.CSSProperties = {
 };
 
 export default function SettingsPage() {
-  const supabase = createClient();
   const { refreshProfile } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -154,12 +152,19 @@ export default function SettingsPage() {
     if (pw1.length < 6) { setPwMsg({ msg: 'Password must be at least 6 characters.', error: true }); return; }
     if (pw1 !== pw2)    { setPwMsg({ msg: 'Passwords do not match.', error: true }); return; }
     setPwBusy(true);
-    const { error } = await supabase.auth.updateUser({ password: pw1 });
-    if (error) {
-      setPwMsg({ msg: error.message, error: true });
-    } else {
+    // Goes through the server (admin API) — the browser supabase.auth.updateUser
+    // call hangs after the API-key migration, the same way getUser/getSession do.
+    const res = await fetch('/api/profile/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw1 }),
+    });
+    const data = await res.json();
+    if (res.ok) {
       setPwMsg({ msg: 'Password changed ✓', error: false });
       setPw1(''); setPw2('');
+    } else {
+      setPwMsg({ msg: data.error || 'Could not change password.', error: true });
     }
     setPwBusy(false);
   }
