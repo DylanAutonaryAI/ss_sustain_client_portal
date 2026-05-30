@@ -15,25 +15,29 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-29 — laptop) — notifications now server-backed
-**Sidebar notification badges moved off localStorage onto Supabase.** The old system
-(`ss-seen-v1` per-browser) re-lit every badge on logout, refresh, or a different machine
-because the "seen" state never left the browser. New design: a `notification_seen` table
-(user × section_key → `seen_ids[]`) read/written via a new service-role route
-(`/api/notifications/seen`). Once a user clicks a section, badges stay cleared **across
-every device, forever**, until a genuinely new id appears. First-load behavior is
-**"start clean"** — current items auto-seed as seen on first encounter, so a brand-new
-account does NOT show a wall of badges. **Run `db/2026-05-29_notification_seen.sql`
-before pushing — until then the route 500's and the badge system silently falls back to
-all-zero.**
+## 📌 Latest handoff note (2026-05-30) — pending-access flow built
+**Foundation for the Stripe purchase → portal flow is in.** Decision (with Dylan): the
+portal does NOT try to enforce the trust-y onboarding steps (welcome pack signing etc.) —
+Sam's existing **Brevo flow stays the gatekeeper**, and the coach unlocks portal access
+with one click when the Brevo step is done. Built this session: pending state on
+`clients` (`access_granted_at` nullable), `/api/clients/grant-access` route, "Pending
+access" pill + dedicated stat card + **Grant access & send invite** button on each
+pending row, and an **Add as pending** checkbox on the Add-client modal so Sam can
+manually create a pending client (Stripe will hit the same code path later via
+`/api/invite-client` with `pending: true`). **Run `db/2026-05-30_client_access.sql`**
+before this works in prod — until then, every existing client will look pending in the
+roster because the column doesn't exist yet.
 
 ⚠️ **Carry-forward before go-live (see Watch out):**
-1. **Run `db/2026-05-29_notification_seen.sql`** (this session's migration — see Active).
-2. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
+1. **Run `db/2026-05-30_client_access.sql`** (this session's migration — see Active).
+2. **Stripe webhook** — still to build. Hits `POST /api/invite-client` with
+   `pending: true` + the customer's email / name / plan-derived goal. Once wired up,
+   purchase on the landing page → pending row appears in the roster automatically.
+3. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
    button — last-minute, do at go-live.
-3. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
+4. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
-4. **Confirm refresh-token health under the new keys** — the "there" fix populates the
+5. **Confirm refresh-token health under the new keys** — the "there" fix populates the
    profile from the server reliably, but if `grant_type=refresh_token` is genuinely broken
    (vs a stranded pre-migration session), browser sessions still can't auto-extend past the
    access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
@@ -45,21 +49,43 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 ---
 
 ## 🔴 Active — pending SQL only
-**Notification badges → Supabase (built; gated on running ONE migration).**
-- Problem: badges popped back on logout / refresh / a new machine. Root cause: "seen"
-  state lived only in this browser's `localStorage` (`ss-seen-v1`), unscoped per user.
-- Fix (this session): `notification_seen` table, per `(user_id, section_key)` →
-  `seen_ids text[]`. New route `app/api/notifications/seen/route.ts` (GET map / POST
-  upsert one section), service-role + cookie-validated `user.id`, same pattern as
-  `tracker`. `lib/notifications.ts` refactored to be DB-backed: fetches the map on
-  mount, marks fire-and-forget POST. "Start clean" semantics — a section that has no
-  row yet auto-seeds to its current ids, so first login is NOT a wall of badges; badges
-  only ever light when a NEW id appears. Sidebars unchanged (same hooks).
-- **Action required: run `db/2026-05-29_notification_seen.sql` in Supabase** before
-  pushing. The route is service-role + RLS-locked; without the table the GET 500's and
-  badges fall back to "always 0" (no harm, but the feature doesn't work).
-- Smoke-test after the SQL: click a section → refresh → badge stays cleared; sign out
-  → sign back in → still cleared; sign in on a second device → still cleared.
+**Pending-access flow (built; gated on running ONE migration).**
+- Goal: when a Stripe purchase lands or Sam manually adds a new client, they appear in
+  the roster as **pending** — NO invite email is sent. Sam runs his Brevo onboarding
+  outside the portal (Calendly call, signed-and-dated welcome pack); when done, he
+  presses **"Grant access & send invite"** on their row, which fires the Supabase
+  invite. The portal does NOT try to enforce trust-y self-attestation; Brevo + Sam's
+  click are the gate.
+- **DB:** `db/2026-05-30_client_access.sql` — adds `clients.access_granted_at
+  timestamptz` (NULL = pending) and backfills every existing row to `created_at` so
+  the current roster doesn't suddenly show as pending. **⚠️ NOT YET RUN IN SUPABASE.**
+- **Routes:**
+  - `POST /api/invite-client` — now accepts `{ pending: true }`. When true, skips
+    `inviteUserByEmail` entirely and inserts a `clients` row with `user_id: null`,
+    `access_granted_at: null`. Default behavior (no `pending` flag) is unchanged.
+  - `POST /api/clients/grant-access` — new route. Body `{ id }`. Sends the invite
+    email and stamps `access_granted_at = now()`. Idempotent (won't double-email
+    a click). Handles the "user already exists in auth" edge case by looking the
+    existing user up by email.
+- **Lib:** `lib/clients.ts` derives `pending = !access_granted_at` on each row and
+  overrides health/lastLogin for pending clients so they don't tank the churn
+  metrics before they can even log in.
+- **UI (`app/coach/clients/page.tsx`):**
+  - Stat row is now 5 cards (added **Pending access**, amber when > 0).
+  - Status column shows a yellow **"Pending access"** pill instead of the
+    Active/Paused/Cancelled pill while pending.
+  - Expanded row has a full-width amber banner with a primary **"Grant access &
+    send invite"** button — appears only for pending clients.
+  - Add-client modal has an **"Add as pending — no invite yet"** checkbox (amber
+    background when checked). Button label changes to "Add as pending" / "Adding…"
+    when set.
+- **Stripe webhook (NOT built yet):** the design is to call `/api/invite-client` with
+  `pending: true` + `{ email, full_name, goal, status }` derived from the
+  `checkout.session.completed` payload. Plan/payment details + the webhook signature
+  verification are a follow-up.
+- Smoke-test after the SQL: add a client with "Add as pending" → see it as Pending
+  access in the roster → open the row → press **Grant access** → invite email arrives
+  → they can set their password and sign in → pill flips to Active.
 
 ---
 
@@ -109,6 +135,12 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-30 — Pending-access flow built (foundation for Stripe → portal).** See Active
+  for the full breakdown. Tldr: `clients.access_granted_at` (nullable), new
+  `/api/clients/grant-access` route, `pending: true` flag on `/api/invite-client`,
+  amber "Pending access" pill + stat card + Grant button in the coach roster, Add-client
+  modal toggle. **Run `db/2026-05-30_client_access.sql` before this works in prod** —
+  without it the column doesn't exist and every existing row will look pending.
 - **2026-05-29 (laptop) — Sidebar notifications moved off localStorage onto Supabase.**
   Old system: `lib/notifications.ts` stored "seen item ids" in `localStorage` under
   `ss-seen-v1`, per browser, unscoped per user → badges re-lit on logout, refresh, or a
@@ -442,9 +474,10 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
   no transform). A `transform` on those wrappers becomes the containing block for any
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
 - **All migrations applied ✅:** `onboarding_progress`, `page_views`, `referral`,
-  `last_login`, `client_program_start`, **`client_status_reason` (run 2026-05-29)**, and
-  **`tracker` (run 2026-05-29)**. **⚠️ `notification_seen` NOT YET RUN — see Active.** If
-  Vercel ever points at a *different* Supabase than local `.env.local`, re-run them there.
+  `last_login`, `client_program_start`, `client_status_reason`, `tracker`, and
+  **`notification_seen` (run 2026-05-29)**. **⚠️ `client_access` NOT YET RUN — see
+  Active.** If Vercel ever points at a *different* Supabase than local `.env.local`,
+  re-run them there.
 - **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
   If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
   — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
@@ -457,4 +490,4 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 
 ---
 
-**Last updated:** 2026-05-29 (laptop) — sidebar notifications moved off localStorage onto Supabase (`notification_seen` table + `/api/notifications/seen` route); first-load is "start clean" (seed current ids as seen). **One pending action before this works in prod: run `db/2026-05-29_notification_seen.sql`.** Still open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
+**Last updated:** 2026-05-30 — pending-access flow built: `clients.access_granted_at` + `/api/clients/grant-access` + roster pending-pill / stat / Grant-button + Add-client "pending" toggle. **One pending action before this works in prod: run `db/2026-05-30_client_access.sql`.** Next chunk of work is the Stripe webhook (call `/api/invite-client` with `pending: true`). Still open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.

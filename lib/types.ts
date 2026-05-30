@@ -78,6 +78,10 @@ export interface Client {
   // Onboarding progress (from onboarding_progress + clients.onboarding_completed_at)
   onboardingCompletedAt?: string; // ISO timestamp; set = fully onboarded
   onboardingStepsDone?: number;   // count of steps finished so far
+  // Portal access — null = pending (e.g. paid via Stripe but Sam hasn't sent
+  // the invite yet); set = invite email sent and they can sign in.
+  accessGrantedAt?: string;
+  pending?: boolean; // derived: !accessGrantedAt
 }
 
 export interface RevenueRow {

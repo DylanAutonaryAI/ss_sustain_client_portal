@@ -55,6 +55,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [goalCustom, setGoalCustom] = useState('');
   const [status, setStatus]         = useState<ClientStatus>('Active');
   const [notes, setNotes]           = useState('');
+  const [pending, setPending]       = useState(false);
   const [error, setError]           = useState('');
   const [loading, setLoading]       = useState(false);
   const [sent, setSent]             = useState(false);
@@ -88,6 +89,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
         status,
         notes: notes.trim(),
         since: getSince(),
+        pending,
       }),
     });
 
@@ -121,7 +123,9 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
               Add <em className="italic" style={{ color: 'var(--accent-text)' }}>Client</em>
             </h2>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>
-              Sends a portal invite email so they can set their password.
+              {pending
+                ? 'Adds them to the roster as pending — no invite email until you grant access.'
+                : 'Sends a portal invite email so they can set their password.'}
             </p>
           </div>
           <button
@@ -186,6 +190,26 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
             />
           </div>
 
+          {/* Pending toggle — for the Stripe purchase flow (no invite until Sam grants access) */}
+          <label
+            className="flex items-start gap-2.5 px-3 py-2.5 rounded-[8px] cursor-pointer transition-colors duration-150"
+            style={{ background: pending ? 'rgba(245,158,11,0.08)' : 'var(--bg2)', border: `1px solid ${pending ? 'rgba(245,158,11,0.25)' : 'var(--border2)'}` }}
+          >
+            <input
+              type="checkbox"
+              checked={pending}
+              onChange={(e) => setPending(e.target.checked)}
+              style={{ marginTop: 2, accentColor: 'var(--amber)' }}
+            />
+            <div className="text-[12px] leading-[1.5]" style={{ color: 'var(--text2)' }}>
+              <span style={{ color: 'var(--text)', fontWeight: 600 }}>Add as pending — no invite yet.</span>
+              <br />
+              <span style={{ color: 'var(--text3)' }}>
+                Use this when they&rsquo;ve paid but haven&rsquo;t finished onboarding outside the portal (Calendly call, signed welcome pack). You&rsquo;ll press <em>Grant access</em> in their row when ready.
+              </span>
+            </div>
+          </label>
+
           {error && <p className="text-[12px]" style={{ color: 'var(--red)' }}>{error}</p>}
         </div>
 
@@ -199,7 +223,11 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
             onMouseEnter={(e) => { if (!loading && !sent) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ''; }}
           >
-            {sent ? 'Invite sent ✓' : loading ? 'Sending invite…' : 'Add client & send invite'}
+            {sent
+              ? (pending ? 'Added ✓' : 'Invite sent ✓')
+              : loading
+                ? (pending ? 'Adding…' : 'Sending invite…')
+                : (pending ? 'Add as pending' : 'Add client & send invite')}
           </button>
           <button
             onClick={onClose}
@@ -371,6 +399,7 @@ export default function ClientRosterPage() {
   const [saved, setSaved]         = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [deleting, setDeleting]   = useState<string | null>(null);
+  const [granting, setGranting]   = useState<string | null>(null);
 
   const fetchClients = useCallback(async () => {
     setLoadError('');
@@ -461,6 +490,30 @@ export default function ClientRosterPage() {
     }
   };
 
+  const grantAccess = async (c: Client) => {
+    if (!window.confirm(
+      `Grant ${c.name} portal access?\n\nThis sends them the Supabase invite email. Only do this once their out-of-portal onboarding (Calendly call, signed welcome pack) is complete.`,
+    )) return;
+    setGranting(c.id);
+    const res = await fetch('/api/clients/grant-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: c.id }),
+    });
+    if (res.ok) {
+      const now = new Date().toISOString();
+      setRoster(prev => prev.map(x =>
+        x.id === c.id
+          ? { ...x, pending: false, accessGrantedAt: now, lastLogin: 'Awaiting first login' }
+          : x,
+      ));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      window.alert(data.error || 'Failed to grant access.');
+    }
+    setGranting(null);
+  };
+
   const deleteClient = async (c: Client) => {
     if (!window.confirm(`Remove ${c.name} from your roster?\n\nThis deletes their client record${c.lastLogin === 'Active login' ? ' and revokes their login' : ''}. This cannot be undone.`)) return;
     setDeleting(c.id);
@@ -475,7 +528,10 @@ export default function ClientRosterPage() {
     setDeleting(null);
   };
 
-  const active    = roster.filter(c => c.status === 'Active').length;
+  // Pending = paid / added but not yet sent the invite. They shouldn't count
+  // toward "Active" (they're not coaching yet) — pulled into their own card.
+  const pending   = roster.filter(c => c.pending).length;
+  const active    = roster.filter(c => c.status === 'Active' && !c.pending).length;
   const paused    = roster.filter(c => c.status === 'Paused').length;
   const cancelled = roster.filter(c => c.status === 'Cancelled').length;
 
@@ -501,9 +557,10 @@ export default function ClientRosterPage() {
           All your clients — active, paused and cancelled. Click a row to edit their phase, program start, status, notes, or payment — or remove the client.
         </p>
 
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-5 gap-3 mb-6">
           <StatCard label="Total clients" value={String(roster.length)} valueColor="var(--accent-text)" />
           <StatCard label="Active"        value={String(active)} valueColor="var(--accent-text)" />
+          <StatCard label="Pending access" value={String(pending)} valueColor={pending > 0 ? 'var(--amber)' : undefined} />
           <StatCard label="Paused"        value={String(paused)} />
           <StatCard label="Cancelled"     value={String(cancelled)} valueColor={cancelled > 0 ? 'var(--red)' : undefined} />
         </div>
@@ -561,7 +618,19 @@ export default function ClientRosterPage() {
                 </div>
                 <div className="text-[13px]" style={{ color: 'var(--text2)' }}>{c.goal}</div>
                 <div className="text-[13px]" style={{ color: 'var(--text2)' }}>{c.duration}</div>
-                <div><StatusPill status={c.status} /></div>
+                <div>
+                  {c.pending ? (
+                    <span
+                      className="inline-flex items-center gap-1 px-2.5 py-[3px] rounded-full text-[10px] font-semibold uppercase tracking-[0.5px]"
+                      style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: 'var(--amber)' }}
+                    >
+                      <span className="w-1 h-1 rounded-full" style={{ background: 'currentColor' }} />
+                      Pending access
+                    </span>
+                  ) : (
+                    <StatusPill status={c.status} />
+                  )}
+                </div>
                 <div><PayTag status={c.payment} /></div>
               </div>
 
@@ -575,6 +644,34 @@ export default function ClientRosterPage() {
                     className="rounded-xl p-[22px] mt-1 grid grid-cols-2 gap-6"
                     style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
                   >
+                    {/* Grant-access banner — only for clients still pending. The primary
+                        action for them; sends the Supabase invite + stamps access_granted_at. */}
+                    {c.pending && (
+                      <div
+                        className="col-span-2 rounded-[10px] px-4 py-3.5 flex items-center justify-between gap-4"
+                        style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}
+                      >
+                        <div>
+                          <h3 className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--text)' }}>
+                            Pending portal access
+                          </h3>
+                          <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
+                            They&rsquo;re on the roster but haven&rsquo;t been invited yet. Grant access once their onboarding outside the portal (Calendly call, signed welcome pack) is done — they&rsquo;ll get the Supabase invite email and can set their password.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => grantAccess(c)}
+                          disabled={granting === c.id}
+                          className="px-4 py-2.5 rounded-[8px] text-[13px] font-semibold text-white transition-all duration-150 flex-shrink-0 disabled:opacity-60"
+                          style={{ background: 'var(--accent)', border: 'none', cursor: granting === c.id ? 'default' : 'pointer' }}
+                          onMouseEnter={(e) => { if (granting !== c.id) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ''; }}
+                        >
+                          {granting === c.id ? 'Sending invite…' : 'Grant access & send invite'}
+                        </button>
+                      </div>
+                    )}
+
                     {/* Onboarding status — full width, read-only proof of completion */}
                     <div
                       className="col-span-2 rounded-[10px] px-4 py-3 flex items-center justify-between gap-4"

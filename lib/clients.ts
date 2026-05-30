@@ -27,6 +27,8 @@ export interface ClientRow {
   // Onboarding (joined server-side in /api/clients)
   onboarding_completed_at?: string | null;
   onboarding_steps_done?: number | null;
+  // Portal access (null = pending, see /api/clients/grant-access)
+  access_granted_at?: string | null;
 }
 
 export function getInitials(name: string) {
@@ -94,6 +96,12 @@ export function healthScore(
 export function mapRow(row: ClientRow): Client {
   const name = row.full_name?.trim() || row.email || 'Unnamed';
   const payment = calcPaymentStatus(row.next_payment_date ?? undefined);
+  // A pending client (paid but invite not sent yet) has no portal session
+  // and shouldn't be scored on login activity — that would tank their health
+  // and put them in the churn list before they can even log in. Treat them
+  // as fully healthy until access is granted; the roster surfaces the
+  // pending state separately so they're not invisible.
+  const pending = !row.access_granted_at;
   return {
     id: row.id,
     name,
@@ -103,9 +111,9 @@ export function mapRow(row: ClientRow): Client {
     duration: durationFrom(row.created_at ?? undefined),
     status: (row.status as ClientStatus) || 'Active',
     payment,
-    lastLogin: formatLastLogin(row.last_login, row.created_at),
+    lastLogin: pending ? 'Pending access' : formatLastLogin(row.last_login, row.created_at),
     msgRead: true,
-    healthScore: healthScore(row.last_login, payment, row.created_at),
+    healthScore: pending ? 100 : healthScore(row.last_login, payment, row.created_at),
     referrals: 0,
     notes: row.notes || '',
     nextPaymentDate: row.next_payment_date ?? undefined,
@@ -117,6 +125,8 @@ export function mapRow(row: ClientRow): Client {
     birthday: row.birthday ?? undefined,
     onboardingCompletedAt: row.onboarding_completed_at ?? undefined,
     onboardingStepsDone: row.onboarding_steps_done ?? 0,
+    accessGrantedAt: row.access_granted_at ?? undefined,
+    pending,
   };
 }
 
