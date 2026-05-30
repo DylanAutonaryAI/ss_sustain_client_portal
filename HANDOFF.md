@@ -43,8 +43,10 @@ roster because the column doesn't exist yet.
    access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
    `POST /auth/v1/token?grant_type=refresh_token` (should be 2xx) confirms it.
 
-Deploys go to **`main`** (we push `master:main`). Workflow: `git pull` at start → work in
-ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
+Deploys go to **`master`** (Vercel's production branch was switched from `main` →
+`master` on 2026-05-30 — see Recently done). A plain `git push origin master` now
+auto-deploys to production. Workflow: `git pull` at start → work in ONE place →
+"update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 
 ---
 
@@ -135,6 +137,20 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+- **2026-05-30 — Settings password change fixed + the REAL cause: Vercel deploy mismatch.**
+  - Symptom: the client Settings → Password "Change password" button hung on "Saving…"
+    forever. First fix: the browser `supabase.auth.updateUser({ password })` call hangs
+    after the API-key migration (same root cause as `getUser`/`getSession`), so it now
+    posts to a **new `app/api/profile/password/route.ts`** that sets the password via the
+    admin client (mirrors `/api/profile/email`). Client `savePassword` wrapped in
+    try/finally + a 15s `AbortController` so the button can never get permanently stuck.
+  - **But the fix kept "not working" — because it never reached production.** Pinned it
+    down: every push to `master` was only making a **Preview** deployment (Vercel's
+    production branch was `main`), so `app.sssustain.com` was frozen on the last manually
+    promoted build. Diagnosis trick that nailed it: a brand-new route returns **404 on the
+    domain** but **401 on the per-commit `*.vercel.app` preview URL** → frozen deploy, not
+    a code bug. **Fix: switched the production branch to `master`** (see Watch out). This
+    HANDOFF push is the first auto-deploy under the new setting.
 - **2026-05-30 — Pending-access flow built (foundation for Stripe → portal).** See Active
   for the full breakdown. Tldr: `clients.access_granted_at` (nullable), new
   `/api/clients/grant-access` route, `pending: true` flag on `/api/invite-client`,
@@ -446,9 +462,13 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
   `NEXT_PUBLIC_SUPABASE_ANON_KEY` an `sb_publishable_…` key (both updated in Vercel + local
   `.env.local`), and the **legacy JWT keys are now disabled**. Verified the old leaked key
   is dead — REST + auth both return `401`. **Do NOT re-enable legacy keys.**
-- **Deploys go to the `main` branch, not `master`.** Vercel's production branch is `main`.
-  We push `master:main` each deploy. To go live, code must reach `main`. (Cleaner: set
-  Vercel's production branch back to `master` in Settings → Git/Environments, delete `main`.)
+- **Deploys go to `master` (FIXED 2026-05-30).** Vercel's production branch (Settings →
+  Environments → Production → Branch Tracking) is now **`master`**, so a plain `git push
+  origin master` auto-deploys to production. Previously it was `main`, so pushes to master
+  only made **Preview** builds and the live site silently froze until someone manually
+  promoted — that wasted a whole session (the password-change "stuck on Saving" hunt was
+  really just the fix never reaching prod). The stale `main` branch can be deleted; nothing
+  tracks it now. **Don't point the production branch back at `main`.**
 - **Vercel env vars (production):** the two `NEXT_PUBLIC_*` keys must be **NON-sensitive**
   (or they won't reach the browser → logins break). Keys are now the **new Supabase API
   keys** (legacy JWT keys disabled): `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_…`,
@@ -490,4 +510,4 @@ ONE place → "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
 
 ---
 
-**Last updated:** 2026-05-30 — pending-access flow built: `clients.access_granted_at` + `/api/clients/grant-access` + roster pending-pill / stat / Grant-button + Add-client "pending" toggle. **One pending action before this works in prod: run `db/2026-05-30_client_access.sql`.** Next chunk of work is the Stripe webhook (call `/api/invite-client` with `pending: true`). Still open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
+**Last updated:** 2026-05-30 — (1) Settings password change fixed (new `/api/profile/password` admin route + anti-hang client) AND root-caused the "fixes aren't taking" problem: **Vercel production branch was `main` while we push `master`, so deploys only made Preview builds — now switched to `master`, pushes auto-deploy to prod.** (2) Pending-access flow built earlier: `clients.access_granted_at` + `/api/clients/grant-access` + roster pending-pill / stat / Grant-button + Add-client "pending" toggle. **One pending action before that works in prod: run `db/2026-05-30_client_access.sql`.** Next chunk of work is the Stripe webhook (call `/api/invite-client` with `pending: true`). Still open: flip `ONBOARDING_TEST_MODE` off + Sam's 2 videos at go-live; confirm refresh-token health.
