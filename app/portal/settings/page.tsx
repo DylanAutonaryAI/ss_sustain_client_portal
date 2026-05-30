@@ -152,21 +152,39 @@ export default function SettingsPage() {
     if (pw1.length < 6) { setPwMsg({ msg: 'Password must be at least 6 characters.', error: true }); return; }
     if (pw1 !== pw2)    { setPwMsg({ msg: 'Passwords do not match.', error: true }); return; }
     setPwBusy(true);
-    // Goes through the server (admin API) — the browser supabase.auth.updateUser
+    // Server route uses the admin API — the browser supabase.auth.updateUser
     // call hangs after the API-key migration, the same way getUser/getSession do.
-    const res = await fetch('/api/profile/password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw1 }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setPwMsg({ msg: 'Password changed ✓', error: false });
-      setPw1(''); setPw2('');
-    } else {
-      setPwMsg({ msg: data.error || 'Could not change password.', error: true });
+    // Wrapped in try/finally so the button NEVER gets stuck on "Saving…", even
+    // if the response is non-JSON (e.g. a Vercel function timeout returning HTML)
+    // or the network drops mid-stream.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch('/api/profile/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw1 }),
+        signal: ctrl.signal,
+      });
+      const data = await res.json().catch(() => ({} as { error?: string }));
+      if (res.ok) {
+        setPwMsg({ msg: 'Password changed ✓', error: false });
+        setPw1(''); setPw2('');
+      } else {
+        setPwMsg({ msg: data.error || 'Could not change password.', error: true });
+      }
+    } catch (e) {
+      const aborted = e instanceof DOMException && e.name === 'AbortError';
+      setPwMsg({
+        msg: aborted
+          ? 'Server took too long. The password may have changed — try signing in with the new one.'
+          : 'Could not reach the server. Try again.',
+        error: true,
+      });
+    } finally {
+      clearTimeout(timer);
+      setPwBusy(false);
     }
-    setPwBusy(false);
   }
 
   const displayName = nickname || fullName || 'You';
