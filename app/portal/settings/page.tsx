@@ -157,9 +157,9 @@ export default function SettingsPage() {
     // Wrapped in try/finally so the button NEVER gets stuck on "Saving…", even
     // if the response is non-JSON (e.g. a Vercel function timeout returning HTML)
     // or the network drops mid-stream.
+    // Abort after 15s so the button can never get permanently stuck on "Saving…".
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
-    const t0 = Date.now();
     try {
       const res = await fetch('/api/profile/password', {
         method: 'POST',
@@ -167,24 +167,20 @@ export default function SettingsPage() {
         body: JSON.stringify({ password: pw1 }),
         signal: ctrl.signal,
       });
-      const ms = Date.now() - t0;
-      const raw = await res.text();              // read as text first so a non-JSON body can't throw
-      let data: { error?: string } = {};
-      try { data = JSON.parse(raw); } catch { /* keep raw below */ }
+      // Read as text first so a non-JSON body (e.g. an error page) can't throw.
+      const data = await res.json().catch(() => ({} as { error?: string }));
       if (res.ok) {
-        setPwMsg({ msg: `Password changed ✓ (${ms}ms)`, error: false });
+        setPwMsg({ msg: 'Password changed ✓', error: false });
         setPw1(''); setPw2('');
       } else {
-        // TEMP diagnostic: surface the real status + body so we can see what the server returned.
-        setPwMsg({ msg: `Failed: HTTP ${res.status} after ${ms}ms — ${data.error || raw.slice(0, 120) || 'no body'}`, error: true });
+        setPwMsg({ msg: data.error || 'Could not change password.', error: true });
       }
     } catch (e) {
-      const ms = Date.now() - t0;
       const aborted = e instanceof DOMException && e.name === 'AbortError';
       setPwMsg({
         msg: aborted
-          ? `Server hung — aborted after ${ms}ms. The password may have changed; try signing in with the new one.`
-          : `Network error after ${ms}ms: ${e instanceof Error ? e.message : 'unknown'}`,
+          ? 'Server took too long. Your password may have changed — try signing in with the new one.'
+          : 'Could not reach the server. Try again.',
         error: true,
       });
     } finally {
