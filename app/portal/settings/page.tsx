@@ -159,6 +159,7 @@ export default function SettingsPage() {
     // or the network drops mid-stream.
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
+    const t0 = Date.now();
     try {
       const res = await fetch('/api/profile/password', {
         method: 'POST',
@@ -166,19 +167,24 @@ export default function SettingsPage() {
         body: JSON.stringify({ password: pw1 }),
         signal: ctrl.signal,
       });
-      const data = await res.json().catch(() => ({} as { error?: string }));
+      const ms = Date.now() - t0;
+      const raw = await res.text();              // read as text first so a non-JSON body can't throw
+      let data: { error?: string } = {};
+      try { data = JSON.parse(raw); } catch { /* keep raw below */ }
       if (res.ok) {
-        setPwMsg({ msg: 'Password changed ✓', error: false });
+        setPwMsg({ msg: `Password changed ✓ (${ms}ms)`, error: false });
         setPw1(''); setPw2('');
       } else {
-        setPwMsg({ msg: data.error || 'Could not change password.', error: true });
+        // TEMP diagnostic: surface the real status + body so we can see what the server returned.
+        setPwMsg({ msg: `Failed: HTTP ${res.status} after ${ms}ms — ${data.error || raw.slice(0, 120) || 'no body'}`, error: true });
       }
     } catch (e) {
+      const ms = Date.now() - t0;
       const aborted = e instanceof DOMException && e.name === 'AbortError';
       setPwMsg({
         msg: aborted
-          ? 'Server took too long. The password may have changed — try signing in with the new one.'
-          : 'Could not reach the server. Try again.',
+          ? `Server hung — aborted after ${ms}ms. The password may have changed; try signing in with the new one.`
+          : `Network error after ${ms}ms: ${e instanceof Error ? e.message : 'unknown'}`,
         error: true,
       });
     } finally {
