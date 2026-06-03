@@ -15,28 +15,37 @@
 
 ---
 
-## 📌 Latest handoff note (2026-05-30) — pending-access flow built
-**Foundation for the Stripe purchase → portal flow is in.** Decision (with Dylan): the
-portal does NOT try to enforce the trust-y onboarding steps (welcome pack signing etc.) —
-Sam's existing **Brevo flow stays the gatekeeper**, and the coach unlocks portal access
-with one click when the Brevo step is done. Built this session: pending state on
-`clients` (`access_granted_at` nullable), `/api/clients/grant-access` route, "Pending
-access" pill + dedicated stat card + **Grant access & send invite** button on each
-pending row, and an **Add as pending** checkbox on the Add-client modal so Sam can
-manually create a pending client (Stripe will hit the same code path later via
-`/api/invite-client` with `pending: true`). **Migration `db/2026-05-30_client_access.sql`
-applied ✅ (2026-05-30) and adding clients from the roster verified working** — both the
-normal-invite path and the "Add as pending" path.
+## 📌 Latest handoff note (2026-05-30 later) — Stripe webhook built (test mode)
+**Stripe → portal is wired end-to-end.** Sam's £185/month Framer Payment Link
+(sandbox) now flows: purchase → `checkout.session.completed` → pending client lands on
+the roster → Sam runs his Brevo onboarding → presses **Grant access & send invite** →
+invite email → client sets password → portal onboarding gate → in. Renewals bump
+`next_payment_date`; failed-card cancellations (Stripe's ~3-week Smart Retries window)
+auto-flip the row to `Cancelled` with reason "Stopped paying". The portal still never
+touches money — it just records what Stripe says happened. Webhook is in a graceful
+503-until-keys-set state, so deploying it changes nothing visible until Vercel has the
+env vars.
 
-⚠️ **Carry-forward before go-live (see Watch out):**
-1. **Stripe webhook** — still to build. Hits `POST /api/invite-client` with
-   `pending: true` + the customer's email / name / plan-derived goal. Once wired up,
-   purchase on the landing page → pending row appears in the roster automatically.
-2. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
+⚠️ **Carry-forward before this works in prod (in order):**
+1. **Run `db/2026-05-30_stripe_integration.sql`** in Supabase — adds
+   `clients.stripe_customer_id` + `stripe_subscription_id` (with unique index = the
+   webhook's idempotency key). The webhook will 500 on the first event until this is
+   applied, and Stripe will retry, so it's safe to do in either order — but neater first.
+2. **Set both env vars in Vercel** (Sensitive, Production):
+   - `STRIPE_SECRET_KEY` = sandbox `sk_test_…`
+   - `STRIPE_WEBHOOK_SECRET` = sandbox `whsec_…` (the Signing secret from Stripe's
+     destination page).
+3. **Smoke-test** — easiest path is a real test purchase through the Framer Payment Link
+   (sandbox) with card `4242 4242 4242 4242`. Pending client should appear in the roster
+   within seconds. Then press Grant access and finish a real-ish flow.
+4. **Repeat steps 2–3 in LIVE mode** when Sam's happy. Create a Live-mode event
+   destination at the same URL, replace both Vercel env vars with live `sk_live_…` and
+   `whsec_…`. **Live keys go straight into Vercel — never paste them in chat.**
+5. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
    button — last-minute, do at go-live.
-3. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
+6. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
-4. **Confirm refresh-token health under the new keys** — the "there" fix populates the
+7. **Confirm refresh-token health under the new keys** — the "there" fix populates the
    profile from the server reliably, but if `grant_type=refresh_token` is genuinely broken
    (vs a stranded pre-migration session), browser sessions still can't auto-extend past the
    access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
@@ -49,18 +58,32 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — nothing actively in progress
-**Pending-access flow is DONE, live, and tested.** Migration applied 2026-05-30; adding
-clients from the roster confirmed working (normal-invite + "Add as pending"). Full
-breakdown moved to Recently done.
-
-**Next planned chunk (not started yet): the Stripe webhook.** A new
-`POST /api/stripe/webhook` that, on `checkout.session.completed`, calls the existing
-`/api/invite-client` with `pending: true` so a paid customer lands in the roster as
-**pending** automatically (Sam then does Brevo onboarding → "Grant access & send invite").
-Needs: the `stripe` package, a Stripe dashboard endpoint, and `STRIPE_SECRET_KEY` +
-`STRIPE_WEBHOOK_SECRET` env vars (start in Stripe **Test mode** with card `4242 4242 4242 4242`).
-Dylan has access to Sam's Stripe account; deferred for now.
+## 🔴 Active — Stripe webhook (built, gated on SQL + env vars + smoke test)
+- **Built this session:**
+  - `app/api/stripe/webhook/route.ts` — Node runtime, signature-verified via
+    `stripe.webhooks.constructEvent`. Handles `checkout.session.completed` (creates
+    pending client), `invoice.paid` (bumps `next_payment_date` for renewals — skips the
+    `subscription_create` first invoice), `customer.subscription.deleted` (auto-marks
+    `Cancelled` + reason "Stopped paying"). Returns graceful 503 until env vars are set.
+  - `db/2026-05-30_stripe_integration.sql` — `clients.stripe_customer_id` +
+    `stripe_subscription_id`, with a **unique index on `stripe_subscription_id`** that
+    is the idempotency key (Stripe retries can't double-create a client).
+  - `stripe@^17.7.0` added to `package.json`.
+- **Sam-side setup done (in this Stripe Sandbox):** event destination
+  `https://app.sssustain.com/api/stripe/webhook` listening for the 3 events above.
+  Signing secret + sandbox secret key in hand (Dylan added to Vercel).
+- **What turns it on (carry-forward list above):**
+  1. Run `db/2026-05-30_stripe_integration.sql`.
+  2. `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` in Vercel.
+  3. Real test purchase via the Framer Payment Link (sandbox, card `4242…`) → pending
+     client should appear in the roster.
+- **Notes / gotchas (also in Watch out):**
+  - "Send test webhook" from Stripe's destination page uses Stripe's *example* payload,
+    which doesn't reference a real subscription — so `checkout.session.completed` test
+    events will 5xx when we try to retrieve the subscription. That's expected and fine
+    for now. The real test is the real purchase flow.
+  - The webhook routes new clients to the single coach (`profiles.role='coach'`). If
+    a second coach is ever added, we'll need to route by Stripe product/price ID.
 
 ---
 
@@ -474,8 +497,9 @@ Dylan has access to Sam's Stripe account; deferred for now.
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
 - **All migrations applied ✅:** `onboarding_progress`, `page_views`, `referral`,
   `last_login`, `client_program_start`, `client_status_reason`, `tracker`,
-  `notification_seen` (run 2026-05-29), and **`client_access` (run 2026-05-30)**. If Vercel
-  ever points at a *different* Supabase than local `.env.local`, re-run them there.
+  `notification_seen` (run 2026-05-29), and `client_access` (run 2026-05-30). **⚠️
+  `stripe_integration` NOT YET RUN — see Active.** If Vercel ever points at a *different*
+  Supabase than local `.env.local`, re-run them there.
 - **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
   If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
   — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
@@ -488,4 +512,4 @@ Dylan has access to Sam's Stripe account; deferred for now.
 
 ---
 
-**Last updated:** 2026-05-30 — Pending-access flow **finished & shipped**: migration `db/2026-05-30_client_access.sql` **applied ✅** and adding clients from the roster verified working (normal-invite + "Add as pending"). Earlier this session: Settings password change fixed (new `/api/profile/password` admin route + anti-hang client), and root-caused why fixes weren't going live — **Vercel's production branch was `main` while we push `master`, so deploys only made Preview builds; now switched to `master`, pushes auto-deploy to prod.** Next chunk: the **Stripe webhook** (new `/api/stripe/webhook` → `/api/invite-client` with `pending: true`). Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
+**Last updated:** 2026-05-30 (later) — **Stripe webhook built (sandbox/test mode)**: new `app/api/stripe/webhook/route.ts` handles `checkout.session.completed` → pending client, `invoice.paid` → bump `next_payment_date`, `customer.subscription.deleted` → auto-cancel with reason "Stopped paying". Idempotent via unique index on `clients.stripe_subscription_id`. Graceful 503 until env vars are set. Stripe destination already created on the sandbox; signing secret + sandbox secret key handed off. **Two things to flip it on: run `db/2026-05-30_stripe_integration.sql` and add `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` in Vercel.** Then smoke-test with the Framer Payment Link + card 4242…, then repeat in Live mode. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
