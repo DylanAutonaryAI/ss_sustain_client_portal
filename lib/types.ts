@@ -82,6 +82,13 @@ export interface Client {
   // the invite yet); set = invite email sent and they can sign in.
   accessGrantedAt?: string;
   pending?: boolean; // derived: !accessGrantedAt
+  // Identification / Stripe linkage. email is the universal identifier
+  // (especially for Stripe-originated pending clients where there's no
+  // profile yet). Stripe IDs let Sam cross-reference in the Stripe dashboard.
+  email?: string;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  fromStripe?: boolean; // derived: !!stripeSubscriptionId
 }
 
 export interface RevenueRow {

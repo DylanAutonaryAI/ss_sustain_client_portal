@@ -29,6 +29,9 @@ export interface ClientRow {
   onboarding_steps_done?: number | null;
   // Portal access (null = pending, see /api/clients/grant-access)
   access_granted_at?: string | null;
+  // Stripe linkage — populated by /api/stripe/webhook on checkout.session.completed
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
 }
 
 export function getInitials(name: string) {
@@ -127,6 +130,10 @@ export function mapRow(row: ClientRow): Client {
     onboardingStepsDone: row.onboarding_steps_done ?? 0,
     accessGrantedAt: row.access_granted_at ?? undefined,
     pending,
+    email: row.email ?? undefined,
+    stripeCustomerId: row.stripe_customer_id ?? undefined,
+    stripeSubscriptionId: row.stripe_subscription_id ?? undefined,
+    fromStripe: !!row.stripe_subscription_id,
   };
 }
 

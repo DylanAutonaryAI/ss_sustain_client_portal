@@ -602,13 +602,27 @@ export default function ClientRosterPage() {
                       c.initials
                     )}
                   </div>
-                  <div>
-                    <div className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
-                      {c.name}
-                      {c.nickname && (
-                        <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · &ldquo;{c.nickname}&rdquo;</span>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium flex items-center gap-2 flex-wrap" style={{ color: 'var(--text)' }}>
+                      <span>
+                        {c.name}
+                        {c.nickname && (
+                          <span style={{ color: 'var(--text3)', fontWeight: 400 }}> · &ldquo;{c.nickname}&rdquo;</span>
+                        )}
+                      </span>
+                      {c.fromStripe && (
+                        <span
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-[4px] uppercase tracking-[0.5px]"
+                          style={{ background: 'rgba(99,91,255,0.12)', color: '#8e87ff', border: '1px solid rgba(99,91,255,0.25)' }}
+                          title="Created from a Stripe purchase"
+                        >
+                          via Stripe
+                        </span>
                       )}
                     </div>
+                    {c.email && (
+                      <div className="text-[11px] truncate" style={{ color: 'var(--text2)' }}>{c.email}</div>
+                    )}
                     <div className="text-[11px] flex items-center gap-2 flex-wrap" style={{ color: 'var(--text3)' }}>
                       <span>{c.since}</span>
                       <span style={{ color: 'var(--border2)' }}>·</span>
@@ -669,6 +683,65 @@ export default function ClientRosterPage() {
                         >
                           {granting === c.id ? 'Sending invite…' : 'Grant access & send invite'}
                         </button>
+                      </div>
+                    )}
+
+                    {/* Stripe details — full width, only when there's a linked subscription.
+                        Lets Sam cross-reference the client in the Stripe dashboard.
+                        Clicking an ID copies it; clicking "Open in Stripe" deep-links. */}
+                    {c.fromStripe && (
+                      <div
+                        className="col-span-2 rounded-[10px] px-4 py-3.5"
+                        style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <h3 className="text-[13px] font-semibold flex items-center gap-2" style={{ color: 'var(--text)' }}>
+                            <span
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded-[4px] uppercase tracking-[0.5px]"
+                              style={{ background: 'rgba(99,91,255,0.12)', color: '#8e87ff', border: '1px solid rgba(99,91,255,0.25)' }}
+                            >
+                              Stripe
+                            </span>
+                            Subscription details
+                          </h3>
+                          {c.stripeCustomerId && (
+                            <a
+                              href={`https://dashboard.stripe.com/customers/${c.stripeCustomerId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] font-semibold transition-colors duration-150"
+                              style={{ color: 'var(--accent-text)' }}
+                            >
+                              Open in Stripe ↗
+                            </a>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px]">
+                          {c.email && (
+                            <div>
+                              <span style={{ color: 'var(--text3)' }}>Email: </span>
+                              <span style={{ color: 'var(--text)' }}>{c.email}</span>
+                            </div>
+                          )}
+                          {c.nextPaymentDate && (
+                            <div>
+                              <span style={{ color: 'var(--text3)' }}>Next billing: </span>
+                              <span style={{ color: 'var(--text)' }}>{formatDate(c.nextPaymentDate)}</span>
+                            </div>
+                          )}
+                          {c.stripeCustomerId && (
+                            <div className="col-span-2 font-mono text-[11px] truncate" title={c.stripeCustomerId}>
+                              <span style={{ color: 'var(--text3)' }}>Customer: </span>
+                              <span style={{ color: 'var(--text2)' }}>{c.stripeCustomerId}</span>
+                            </div>
+                          )}
+                          {c.stripeSubscriptionId && (
+                            <div className="col-span-2 font-mono text-[11px] truncate" title={c.stripeSubscriptionId}>
+                              <span style={{ color: 'var(--text3)' }}>Subscription: </span>
+                              <span style={{ color: 'var(--text2)' }}>{c.stripeSubscriptionId}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
