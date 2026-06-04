@@ -166,11 +166,17 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   const nextPaymentDate = periodEndIsoDate(sub);
 
+  // Stripe Payment Links collect phone only when the merchant enables it; when
+  // present it's an E.164 string. Defensively read it either way — surfaces in
+  // the roster's About block with a wa.me link if set, blank if not.
+  const phone = session.customer_details?.phone ?? null;
+
   const { error } = await admin.from('clients').insert({
     user_id: null, // pending — no auth user yet
     coach_id: coachId,
     full_name: fullName,
     email,
+    phone,
     goal: null,
     status: 'Active',
     next_payment_date: nextPaymentDate,

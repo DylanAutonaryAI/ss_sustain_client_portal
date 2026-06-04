@@ -51,6 +51,7 @@ const STATUS_REASONS = [
 function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const [name, setName]             = useState('');
   const [email, setEmail]           = useState('');
+  const [phone, setPhone]           = useState('');
   const [goal, setGoal]             = useState('Fat loss');
   const [goalCustom, setGoalCustom] = useState('');
   const [status, setStatus]         = useState<ClientStatus>('Active');
@@ -85,6 +86,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
       body: JSON.stringify({
         email: email.trim(),
         full_name: name.trim(),
+        phone: phone.trim() || null,
         goal: finalGoal,
         status,
         notes: notes.trim(),
@@ -156,6 +158,19 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
                 onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
               />
             </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Phone / WhatsApp (optional)</label>
+            <input
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="e.g. +44 7700 900123"
+              type="tel"
+              style={inputStyle}
+              onFocus={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+              onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
+            />
           </div>
 
           <div>
@@ -394,7 +409,7 @@ export default function ClientRosterPage() {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openNotes, setOpenNotes] = useState<string | null>(null);
-  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string }>>({});
+  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string; phone: string }>>({});
   const [customPhase, setCustomPhase] = useState<Record<string, boolean>>({});
   const [saved, setSaved]         = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
@@ -445,6 +460,7 @@ export default function ClientRosterPage() {
       status: c.status,
       statusReason: c.statusReason ?? '',
       statusNote: c.statusNote ?? '',
+      phone: c.phone ?? '',
     };
 
   const toggleNotes = (id: string) => setOpenNotes(openNotes === id ? null : id);
@@ -455,6 +471,7 @@ export default function ClientRosterPage() {
     // Reason only applies when paused/cancelled — clear it when back to Active.
     const statusReason = d.status === 'Active' ? null : (d.statusReason || null);
     const statusNote   = d.status === 'Active' ? null : (d.statusNote.trim() || null);
+    const phone = d.phone.trim() || null;
     const res = await fetch('/api/clients', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -467,6 +484,7 @@ export default function ClientRosterPage() {
         status: d.status,
         status_reason: statusReason,
         status_note: statusNote,
+        phone,
       }),
     });
     if (res.ok) {
@@ -482,6 +500,7 @@ export default function ClientRosterPage() {
               status: d.status,
               statusReason: statusReason ?? undefined,
               statusNote: statusNote ?? undefined,
+              phone: phone ?? undefined,
             }
           : x
       ));
@@ -744,6 +763,66 @@ export default function ClientRosterPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* About — full-width quick-reference panel on every client.
+                        Read-only except phone, which is inline-editable so Sam can fill
+                        it in without leaving the row. Saves with the bottom "Save changes". */}
+                    <div
+                      className="col-span-2 rounded-[10px] px-4 py-3.5"
+                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}
+                    >
+                      <h3 className="text-[13px] font-semibold mb-2.5" style={{ color: 'var(--text)' }}>
+                        About
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>Email</div>
+                          <div style={{ color: 'var(--text)' }}>{c.email || '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.5px] flex items-center gap-2" style={{ color: 'var(--text3)' }}>
+                            <span>Phone / WhatsApp</span>
+                            {c.phone && (
+                              <a
+                                href={`https://wa.me/${c.phone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] font-semibold normal-case tracking-normal"
+                                style={{ color: 'var(--accent-text)' }}
+                              >
+                                WhatsApp ↗
+                              </a>
+                            )}
+                          </div>
+                          <input
+                            value={getDraft(c).phone}
+                            onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), phone: e.target.value } }))}
+                            placeholder="—"
+                            type="tel"
+                            className="w-full bg-transparent outline-none text-[12px] py-0.5"
+                            style={{ color: 'var(--text)', border: 'none', borderBottom: '1px dashed var(--border2)' }}
+                          />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>Birthday</div>
+                          <div style={{ color: 'var(--text)' }}>{c.birthday ? formatDate(c.birthday) : '—'}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>Last login</div>
+                          <div style={{ color: 'var(--text)' }}>{c.lastLogin}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>Phase &middot; Week</div>
+                          <div style={{ color: 'var(--text)' }}>
+                            {c.goal && c.goal !== '—' ? c.goal : 'Phase'} &middot; Week {weekFromStart(c.programStart) ?? 'N'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>Member since</div>
+                          <div style={{ color: 'var(--text)' }}>{c.since || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Onboarding status — full width, read-only proof of completion */}
                     <div

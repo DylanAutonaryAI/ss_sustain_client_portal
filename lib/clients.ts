@@ -32,6 +32,8 @@ export interface ClientRow {
   // Stripe linkage — populated by /api/stripe/webhook on checkout.session.completed
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
+  // Optional phone / WhatsApp (Sam's main comms channel)
+  phone?: string | null;
 }
 
 export function getInitials(name: string) {
@@ -131,6 +133,7 @@ export function mapRow(row: ClientRow): Client {
     accessGrantedAt: row.access_granted_at ?? undefined,
     pending,
     email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
     stripeCustomerId: row.stripe_customer_id ?? undefined,
     stripeSubscriptionId: row.stripe_subscription_id ?? undefined,
     fromStripe: !!row.stripe_subscription_id,

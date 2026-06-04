@@ -86,6 +86,7 @@ export interface Client {
   // (especially for Stripe-originated pending clients where there's no
   // profile yet). Stripe IDs let Sam cross-reference in the Stripe dashboard.
   email?: string;
+  phone?: string;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   fromStripe?: boolean; // derived: !!stripeSubscriptionId
