@@ -37,9 +37,11 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'welcome',
     type: 'video',
     title: 'Welcome to SS Sustain',
-    duration: '2 min',
+    duration: '1 min',
     description: "A personal message from Coach Sam. What you've signed up for, what to expect, and how this journey works.",
-    placeholder: true, // TODO(Sam): welcome video Loom URL — Sam recording this week
+    // Self-hosted mp4 (plays via a native <video>, unlike the Loom steps below).
+    // Compressed web copy — the 114MB master is gitignored in public/images.
+    url: '/images/welcome-video.mp4',
   },
   {
     id: 'portal-tour',

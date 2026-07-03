@@ -33,9 +33,12 @@ export default function OnboardingPage() {
   const step = ONBOARDING_STEPS[currentIdx];
   const isComplete = completed.has(step.id);
   const embedUrl = step.type === 'video' ? loomEmbedUrl(step.url) : null;
+  // Self-hosted video file (in /public) — played with a native <video> element
+  // rather than a Loom iframe.
+  const isLocalVideo = step.type === 'video' && !!step.url && step.url.startsWith('/') && step.url.endsWith('.mp4');
   // Ready to confirm when there's nothing to open first: an embedded video plays
   // inline, a placeholder has no link, or a doc/action link has already been opened.
-  const isOpened = opened.has(step.id) || !step.url || !!embedUrl;
+  const isOpened = opened.has(step.id) || !step.url || !!embedUrl || isLocalVideo;
   const allDone = completedAt !== null;
 
   // Hydrate progress from the server so a returning / cross-device client picks
@@ -128,7 +131,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
       {/* Top bar */}
       <div
-        className="flex items-center justify-between px-8 py-4"
+        className="flex items-center justify-between px-4 md:px-8 py-4"
         style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar-bg)' }}
       >
         <div className="flex items-center gap-2.5">
@@ -140,7 +143,7 @@ export default function OnboardingPage() {
         </span>
       </div>
 
-      <div className="max-w-[760px] mx-auto px-6 py-10">
+      <div className="max-w-[760px] mx-auto px-4 md:px-6 py-8 md:py-10">
         {/* Heading */}
         <div className="mb-2">
           <h1 className="font-serif text-[32px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
@@ -208,11 +211,21 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {/* Video — embedded Loom player (shows its own thumbnail + play, plays
-              inline), or a "coming soon" placeholder until Sam supplies the URL. */}
+          {/* Video — a native player for self-hosted mp4s, an embedded Loom player
+              (shows its own thumbnail + play, plays inline) for Loom URLs, or a
+              "coming soon" placeholder until Sam supplies the content. */}
           {step.type === 'video' && (
             <div className="aspect-video relative" style={{ background: 'var(--bg2)' }}>
-              {embedUrl ? (
+              {isLocalVideo ? (
+                <video
+                  src={step.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="absolute inset-0 w-full h-full"
+                  style={{ background: '#000' }}
+                />
+              ) : embedUrl ? (
                 <iframe
                   src={embedUrl}
                   title={step.title}
@@ -333,7 +346,7 @@ export default function OnboardingPage() {
                 </button>
               )}
 
-              {step.url && !isComplete && isOpened && !embedUrl && (
+              {step.url && !isComplete && isOpened && !embedUrl && !isLocalVideo && (
                 <button
                   onClick={openStep}
                   className="text-[12px] transition-colors duration-150"

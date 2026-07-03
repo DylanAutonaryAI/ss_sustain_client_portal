@@ -50,7 +50,25 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — nothing actively in progress
+## 🟢 Active — welcome video embedded (2026-07-03), portal-walkthrough video still pending
+**Onboarding welcome video (step 1) is DONE.** Sam sent it as an **mp4** (not a Loom),
+added at `public/images/sssustain welcome video.mp4` (114MB HEVC/1080p50 master). That
+master is **gitignored** (GitHub rejects >100MB; browsers can't play HEVC), and a
+web-ready copy `public/images/welcome-video.mp4` (23.6MB, H.264/AAC, `+faststart`) was
+re-encoded with ffmpeg and **is committed**. `lib/onboarding.ts` step `welcome` now
+points `url` at `/images/welcome-video.mp4` (placeholder flag removed, duration → 1 min).
+`app/onboarding/page.tsx` gained an `isLocalVideo` path: any step `url` that starts `/`
+and ends `.mp4` renders in a native `<video controls>` (vs the Loom iframe path).
+Verified against a production build + `next start`: onboarding page 200, video serves
+`video/mp4` with `Accept-Ranges: bytes` and a range request returns 206. **The only
+onboarding content blocker left is Sam's "How to use your portal" walkthrough video
+(step 2, still a placeholder).** If that also arrives as an mp4, repeat the recipe
+(ffmpeg H.264 CRF 22 / 25fps / AAC 128k / `+faststart`, commit the small copy, gitignore
+the master).
+
+---
+
+## 🟢 Earlier active — nothing else in progress
 **Stripe sandbox flow is DONE, verified, and shipped.** Sandbox event destination is
 live in Sam's account, both Vercel env vars set, `db/2026-05-30_stripe_integration.sql`
 applied and verified by a real test purchase (£185, card `4242…`). Pending client
