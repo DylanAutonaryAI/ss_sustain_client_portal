@@ -13,13 +13,19 @@ import { useAuth } from '@/context/AuthContext';
 
 function UpcomingEventsWidget() {
   const { events, rsvp, myUserId } = useCommunity();
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
   const allUpcoming = events
     .filter(ev => ev.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const upcoming = allUpcoming.slice(0, 3);
 
-  if (!upcoming.length) return null;
+  // No date picked → next 3 upcoming. A date picked in the calendar → that day's
+  // events (any day, so past events on that date show too).
+  const upcoming = selectedDate
+    ? events.filter(ev => ev.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
+    : allUpcoming.slice(0, 3);
+
+  if (!allUpcoming.length && !selectedDate) return null;
 
   return (
     <>
@@ -36,6 +42,25 @@ function UpcomingEventsWidget() {
       <div className="flex flex-col lg:flex-row gap-4 lg:items-start">
         {/* Event list */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">
+          {selectedDate && (
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[12px]" style={{ color: 'var(--text2)' }}>
+                Showing <strong style={{ color: 'var(--text)' }}>{new Date(selectedDate + 'T12:00:00').toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })}</strong>
+              </span>
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="text-[11px] px-2 py-0.5 rounded-[5px]"
+                style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text3)', cursor: 'pointer' }}
+              >
+                Clear ×
+              </button>
+            </div>
+          )}
+          {upcoming.length === 0 && (
+            <div className="px-4 py-3 rounded-[12px] text-[12px]" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text3)' }}>
+              No events on this day.
+            </div>
+          )}
           {upcoming.map(ev => {
             const style = EVENT_STYLES[ev.type];
             const d = new Date(ev.date + 'T12:00:00');
@@ -90,9 +115,9 @@ function UpcomingEventsWidget() {
           })}
         </div>
 
-        {/* Mini calendar */}
+        {/* Mini calendar — click a day to filter the list to it */}
         <div className="w-full lg:w-[240px] flex-shrink-0">
-          <MiniCalendar events={allUpcoming} showLegend={false} />
+          <MiniCalendar events={allUpcoming} selectedDate={selectedDate} onDaySelect={setSelectedDate} showLegend={false} />
         </div>
       </div>
     </>
