@@ -9,6 +9,11 @@ import { ClientProvider } from "@/context/ClientContext";
 export const metadata: Metadata = {
   title: "SS Sustain — Client Portal",
   description: "Your coaching portal",
+  icons: {
+    icon: "/applogo.png",
+    shortcut: "/applogo.png",
+    apple: "/applogo.png",
+  },
 };
 
 export default function RootLayout({
