@@ -10,7 +10,7 @@ export default function TrainingPage() {
   return (
     <>
       <PortalTopbar title="Training Clips" />
-      <div className="px-8 py-7 max-w-[760px]">
+      <div className="px-8 py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Training <em className="italic" style={{ color: 'var(--accent-text)' }}>Clips</em>
         </div>
@@ -47,7 +47,7 @@ export default function TrainingPage() {
             {[
               'Film your exercise — aim for a clear side or rear angle',
               'Save the clip to your camera roll or cloud storage',
-              'Send 6 clips per week via the messaging tab or your check-in',
+              'Send some clips each week via the messaging tab or your check-in',
               'Sam will review your form and leave feedback on your next check-in',
             ].map((step, i) => (
               <li key={i} className="flex items-start gap-3 text-[13px] leading-[1.6]" style={{ color: 'var(--text2)' }}>
@@ -80,7 +80,7 @@ export default function TrainingPage() {
         </div>
 
         <div className="px-[18px] py-3.5 rounded-r-[9px] text-[13px] leading-[1.7]" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderLeft: '2px solid var(--accent)', color: 'var(--text2)', boxShadow: 'var(--shadow-sm)' }}>
-          <strong style={{ color: 'var(--accent-text)', fontWeight: 600 }}>Daily non-negotiable:</strong> 6 training clips sent per week is a requirement of the programme. These allow Sam to give you accurate, personalised form feedback.
+          <strong style={{ color: 'var(--accent-text)', fontWeight: 600 }}>Non-negotiable:</strong> sending some training clips each week is a requirement of the programme. These allow Sam to give you accurate, personalised form feedback.
         </div>
       </div>
     </>
