@@ -221,7 +221,7 @@ export default function LoginPage() {
                   ? 'Coaching access only. Contact support if you need help.'
                   : 'New client? Access is set up by your coach.\nGet in touch at '}
                 {tab === 'client' && (
-                  <a href="mailto:coach@sssustain.com" style={{ color: 'var(--accent)' }}>coach@sssustain.com</a>
+                  <a href="mailto:sam@sssustain.com" style={{ color: 'var(--accent)' }}>sam@sssustain.com</a>
                 )}
               </p>
             </>
