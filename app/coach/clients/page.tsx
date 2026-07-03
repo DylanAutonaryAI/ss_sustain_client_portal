@@ -10,6 +10,7 @@ import { mapRow, type ClientRow } from '@/lib/clients';
 import { weekFromStart } from '@/lib/my-client';
 import { ONBOARDING_TOTAL } from '@/lib/onboarding';
 import { weekStats, type TrackerProfile, type TrackerLog } from '@/lib/tracker';
+import ImportClientsModal from '@/components/coach/ImportClientsModal';
 import type { Client, ClientStatus } from '@/lib/types';
 
 // Onboarding state for the roster: completed (green), in progress (amber), or
@@ -413,6 +414,8 @@ export default function ClientRosterPage() {
   const [customPhase, setCustomPhase] = useState<Record<string, boolean>>({});
   const [saved, setSaved]         = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [grantingAll, setGrantingAll] = useState(false);
   const [deleting, setDeleting]   = useState<string | null>(null);
   const [granting, setGranting]   = useState<string | null>(null);
 
@@ -533,6 +536,23 @@ export default function ClientRosterPage() {
     setGranting(null);
   };
 
+  const grantAccessAll = async () => {
+    const n = roster.filter(c => c.pending).length;
+    if (!window.confirm(
+      `Send portal invites to all ${n} pending client${n === 1 ? '' : 's'}?\n\nEach gets the Supabase invite email to set their password. Only do this once they're ready to be onboarded.`,
+    )) return;
+    setGrantingAll(true);
+    const res = await fetch('/api/clients/grant-access-all', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    setGrantingAll(false);
+    if (res.ok) {
+      await fetchClients();
+      window.alert(`Invited ${data.invited}${data.failed ? ` · ${data.failed} failed (retry)` : ''}.`);
+    } else {
+      window.alert(data.error || 'Failed to grant access.');
+    }
+  };
+
   const deleteClient = async (c: Client) => {
     if (!window.confirm(`Remove ${c.name} from your roster?\n\nThis deletes their client record${c.lastLogin === 'Active login' ? ' and revokes their login' : ''}. This cannot be undone.`)) return;
     setDeleting(c.id);
@@ -562,15 +582,26 @@ export default function ClientRosterPage() {
           <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15]" style={{ color: 'var(--text)' }}>
             Client <em className="italic" style={{ color: 'var(--accent-text)' }}>Roster</em>
           </div>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-150 mt-1"
-            style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ''; }}
-          >
-            + Add client
-          </button>
+          <div className="flex items-center gap-2 mt-1 flex-shrink-0">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-[9px] text-[13px] font-semibold transition-all duration-150"
+              style={{ background: 'transparent', border: '1px solid var(--border2)', color: 'var(--text2)', cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg2)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+            >
+              ↑ Import
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-150"
+              style={{ background: 'var(--accent)', border: 'none', cursor: 'pointer' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ''; }}
+            >
+              + Add client
+            </button>
+          </div>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
           All your clients — active, paused and cancelled. Click a row to edit their phase, program start, status, notes, or payment — or remove the client.
@@ -583,6 +614,25 @@ export default function ClientRosterPage() {
           <StatCard label="Paused"        value={String(paused)} />
           <StatCard label="Cancelled"     value={String(cancelled)} valueColor={cancelled > 0 ? 'var(--red)' : undefined} />
         </div>
+
+        {pending > 0 && (
+          <div
+            className="mb-6 px-4 py-3 rounded-[10px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}
+          >
+            <div className="text-[13px]" style={{ color: 'var(--text2)' }}>
+              <strong style={{ color: 'var(--amber)' }}>{pending} pending</strong> — added to the roster but not yet invited. Send them all their portal invite when they&rsquo;re ready to onboard.
+            </div>
+            <button
+              onClick={grantAccessAll}
+              disabled={grantingAll}
+              className="flex-shrink-0 px-4 py-2 rounded-[8px] text-[12px] font-semibold text-white transition-all duration-150 disabled:opacity-60"
+              style={{ background: 'var(--accent)', border: 'none', cursor: grantingAll ? 'default' : 'pointer' }}
+            >
+              {grantingAll ? 'Sending invites…' : `Grant access to all ${pending} pending`}
+            </button>
+          </div>
+        )}
 
         {loadError && (
           <div className="mb-4 px-4 py-3 rounded-[10px] text-[13px]" style={{ color: 'var(--red)', background: 'rgba(240,79,79,0.08)', border: '1px solid rgba(240,79,79,0.2)' }}>
@@ -1059,6 +1109,13 @@ export default function ClientRosterPage() {
       </div>
 
       {showAdd && <AddClientModal onClose={() => setShowAdd(false)} onAdded={fetchClients} />}
+      {showImport && (
+        <ImportClientsModal
+          existingEmails={new Set(roster.map(c => (c.email ?? '').toLowerCase()).filter(Boolean))}
+          onClose={() => setShowImport(false)}
+          onImported={fetchClients}
+        />
+      )}
     </>
   );
 }
