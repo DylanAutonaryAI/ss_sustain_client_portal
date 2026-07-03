@@ -28,6 +28,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const rows: ImportRow[] = Array.isArray(body.clients) ? body.clients : [];
+  // skipOnboarding (default true): existing clients bypass the portal onboarding
+  // flow. Set false to route imported clients THROUGH onboarding (e.g. clients
+  // who haven't done Sam's onboarding yet).
+  const skipOnboarding = body.skipOnboarding !== false;
   if (rows.length === 0) return NextResponse.json({ error: 'No rows to import.' }, { status: 400 });
   if (rows.length > 500) return NextResponse.json({ error: 'Too many rows (max 500 per import).' }, { status: 400 });
 
@@ -74,8 +78,8 @@ export async function POST(request: NextRequest) {
       status: 'Active',
       since,
       referral_code: generateReferralCode(name),
-      access_granted_at: null,          // pending — no invite yet
-      onboarding_completed_at: nowIso,  // existing client — skip onboarding
+      access_granted_at: null,                                  // pending — no invite yet
+      onboarding_completed_at: skipOnboarding ? nowIso : null,  // skip vs route through onboarding
     });
   }
 

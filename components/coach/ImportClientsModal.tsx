@@ -68,6 +68,7 @@ export default function ImportClientsModal({
   onImported: () => void;
 }) {
   const [text, setText] = useState('');
+  const [skipOnboarding, setSkipOnboarding] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<{ added: number; duplicate: number; invalid: number } | null>(null);
@@ -92,7 +93,10 @@ export default function ImportClientsModal({
     const res = await fetch('/api/clients/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clients: validRows.map((r) => ({ full_name: r.full_name, email: r.email, phone: r.phone, goal: r.goal })) }),
+      body: JSON.stringify({
+        clients: validRows.map((r) => ({ full_name: r.full_name, email: r.email, phone: r.phone, goal: r.goal })),
+        skipOnboarding,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
@@ -118,7 +122,7 @@ export default function ImportClientsModal({
               Import <em className="italic" style={{ color: 'var(--accent-text)' }}>Clients</em>
             </h2>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>
-              Added as <strong>pending</strong> (no email yet) and marked as already onboarded. Invite them with &ldquo;Grant access to all pending&rdquo; when ready.
+              Added as <strong>pending</strong> (no email yet). Invite them with &ldquo;Grant access to all pending&rdquo; when ready.
             </p>
           </div>
           <button
@@ -173,6 +177,34 @@ export default function ImportClientsModal({
                 Columns in order: <strong>Name, Email</strong>, then optional Phone and Goal. A header row is skipped automatically.
               </p>
 
+              {/* Onboarding toggle */}
+              <button
+                type="button"
+                onClick={() => setSkipOnboarding((v) => !v)}
+                className="flex items-center gap-3 px-3.5 py-3 rounded-[10px] text-left transition-colors duration-150"
+                style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', cursor: 'pointer' }}
+              >
+                <span
+                  className="relative flex-shrink-0 rounded-full transition-colors duration-200"
+                  style={{ width: 38, height: 22, background: skipOnboarding ? 'var(--accent)' : 'var(--border2)' }}
+                >
+                  <span
+                    className="absolute top-[3px] rounded-full bg-white transition-all duration-200"
+                    style={{ width: 16, height: 16, left: skipOnboarding ? 19 : 3 }}
+                  />
+                </span>
+                <span>
+                  <span className="block text-[12.5px] font-semibold" style={{ color: 'var(--text)' }}>
+                    {skipOnboarding ? 'Skip onboarding' : 'Require onboarding'}
+                  </span>
+                  <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>
+                    {skipOnboarding
+                      ? 'Existing clients land straight on the home page — for anyone who already did onboarding.'
+                      : 'Imported clients must complete the portal onboarding flow before they get in.'}
+                  </span>
+                </span>
+              </button>
+
               {/* Preview */}
               {rows.length > 0 && (
                 <div className="rounded-[10px] overflow-hidden" style={{ border: '1px solid var(--border)' }}>
@@ -214,7 +246,9 @@ export default function ImportClientsModal({
                 className="px-5 py-2.5 rounded-[8px] text-[13px] font-semibold text-white transition-all duration-150 disabled:opacity-50"
                 style={{ background: 'var(--accent)', border: 'none', cursor: loading || validRows.length === 0 ? 'default' : 'pointer' }}
               >
-                {loading ? 'Importing…' : `Import ${validRows.length} client${validRows.length === 1 ? '' : 's'} as pending`}
+                {loading
+                  ? 'Importing…'
+                  : `Import ${validRows.length} · ${skipOnboarding ? 'skip onboarding' : 'require onboarding'}`}
               </button>
               <button
                 onClick={onClose}
