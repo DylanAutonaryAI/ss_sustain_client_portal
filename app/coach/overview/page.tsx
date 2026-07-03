@@ -28,7 +28,7 @@ export default function CoachOverviewPage() {
   return (
     <>
       <Topbar title="Overview" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Good morning, <em className="italic" style={{ color: 'var(--accent-text)' }}>Coach.</em>
         </div>
@@ -36,7 +36,7 @@ export default function CoachOverviewPage() {
           Here&apos;s your business at a glance.
         </p>
 
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard label="Active clients"      value={String(activeCount)}      change={`${clients.length} total`}                         changeType="neutral" valueColor="var(--accent-text)" />
           <StatCard label="MRR"                 value={formatGBP(mrr)}           change="Active clients × current rate"                     changeType="neutral" valueColor="var(--accent-text)" />
           <StatCard label="Payments due"        value={String(paymentsDue)}      change={paymentsDue > 0 ? 'Needs chasing' : 'All up to date'} changeType="neutral" valueColor={paymentsDue > 0 ? 'var(--red)' : 'var(--accent-text)'} />
@@ -72,6 +72,8 @@ export default function CoachOverviewPage() {
           className="rounded-xl overflow-hidden"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
+          <div className="overflow-x-auto">
+          <div style={{ minWidth: 640 }}>
           <div
             className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
             style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
@@ -128,6 +130,8 @@ export default function CoachOverviewPage() {
               No clients yet. Add your first one from the Client Roster.
             </div>
           )}
+          </div>
+          </div>
         </div>
       </div>
     </>

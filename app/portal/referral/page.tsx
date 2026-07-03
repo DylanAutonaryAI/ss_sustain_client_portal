@@ -60,7 +60,7 @@ export default function ReferralPage() {
   return (
     <>
       <Topbar title="Refer a Friend" statusLabel="Your account" />
-      <div className="min-h-[calc(100vh-56px)] flex flex-col items-center justify-center px-8 py-12">
+      <div className="min-h-[calc(100vh-56px)] flex flex-col items-center justify-center px-4 md:px-8 py-12">
         <div className="w-full max-w-[820px]">
           <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5 text-center" style={{ color: 'var(--text)' }}>
             Refer a <em className="italic" style={{ color: 'var(--accent-text)' }}>Friend</em>
@@ -146,9 +146,10 @@ export default function ReferralPage() {
             {!loading && <span className="text-[12px]" style={{ color: 'var(--text3)' }}>{leads.length} total</span>}
           </div>
           <div
-            className="rounded-[10px] overflow-hidden"
+            className="rounded-[10px] overflow-x-auto"
             style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
           >
+            <div style={{ minWidth: '420px' }}>
             <div
               className="grid grid-cols-3 px-[18px] py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
               style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
@@ -195,6 +196,7 @@ export default function ReferralPage() {
                 </div>
               ))
             )}
+            </div>
           </div>
 
           {/* Team leaderboard — counts only, first name + last initial */}

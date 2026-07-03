@@ -201,7 +201,7 @@ export default function AnnouncementsPage() {
   return (
     <>
       <Topbar title="Announcements" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Post <em className="italic" style={{ color: 'var(--accent-text)' }}>Announcement</em>
         </div>
@@ -209,9 +209,9 @@ export default function AnnouncementsPage() {
           Write a message every client sees when they log in.
         </p>
 
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
           {/* Compose form */}
-          <div className="w-[420px] flex-shrink-0">
+          <div className="w-full lg:w-[420px] flex-shrink-0">
             <div
               className="rounded-xl p-[22px]"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
@@ -249,7 +249,7 @@ export default function AnnouncementsPage() {
           </div>
 
           {/* Divider */}
-          <div className="w-px self-stretch" style={{ background: 'var(--border)' }} />
+          <div className="hidden lg:block w-px self-stretch" style={{ background: 'var(--border)' }} />
 
           {/* Published list */}
           <div className="flex-1 min-w-0">

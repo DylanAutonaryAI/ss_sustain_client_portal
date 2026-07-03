@@ -213,7 +213,7 @@ export default function ChatWidget() {
       }}
       style={{
         width: 'min(380px, calc(100vw - 2rem))',
-        height: 'min(600px, calc(100vh - 2.5rem))',
+        height: 'min(600px, calc(100dvh - 2.5rem))',
         background: 'var(--surface)',
         border: '1px solid var(--border2)',
         borderRadius: 18,

@@ -29,7 +29,7 @@ export default function ForecastPage() {
   return (
     <>
       <Topbar title="Revenue Forecast" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Revenue <em className="italic" style={{ color: 'var(--accent-text)' }}>Forecast</em>
         </div>
@@ -50,7 +50,7 @@ export default function ForecastPage() {
           <p className="text-[13px] font-medium mb-1" style={{ color: 'var(--text2)' }}>
             3-month projection — at current run rate (assumes clients stay steady)
           </p>
-          <div className="grid grid-cols-3 gap-2.5 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4">
             {months.map((m) => (
               <div
                 key={m.label}
@@ -78,7 +78,7 @@ export default function ForecastPage() {
         <div className="flex items-center justify-between mb-3">
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>What moves the needle</span>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <StatCard label="Each new client adds"    value={`${formatGBP(avgPerClient)}/mo`} valueColor="var(--accent-text)" change="recurring, at your average rate" />
           <StatCard label="Annual value per client" value={formatGBP(avgPerClient * 12)}    valueColor="var(--accent-text)" change="over 12 months" />
           <StatCard label="Losing one client costs" value={formatGBP(avgPerClient * 12)}    valueColor="var(--red)"         change="per year at current rate" />

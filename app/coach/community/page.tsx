@@ -259,7 +259,7 @@ export default function CoachCommunityPage() {
   return (
     <>
       <Topbar title="Community Events" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Community <em className="italic" style={{ color: 'var(--accent-text)' }}>Events</em>
         </div>
@@ -283,8 +283,8 @@ export default function CoachCommunityPage() {
 
           {addOpen && (
             <div style={{ borderTop: '1px solid var(--border)', padding: '18px 20px 20px' }}>
-              <div className="grid grid-cols-4 gap-3 mb-3">
-                <div className="col-span-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <div className="col-span-full">
                   <label className="block text-[11px] font-semibold uppercase tracking-[0.7px] mb-1" style={{ color: 'var(--text3)' }}>Title</label>
                   <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Weekly Group Call" style={inputBase} onFocus={focusInput} onBlur={blurInput} />
                 </div>
@@ -329,7 +329,7 @@ export default function CoachCommunityPage() {
         </div>
 
         {/* Two-column split: events list + calendar */}
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
 
           {/* Left: events list */}
           <div className="flex-1 min-w-0">
@@ -365,7 +365,7 @@ export default function CoachCommunityPage() {
           </div>
 
           {/* Right: sticky calendar */}
-          <div className="w-[270px] flex-shrink-0" style={{ position: 'sticky', top: '24px' }}>
+          <div className="w-full lg:w-[270px] flex-shrink-0 lg:sticky lg:top-6">
             <MiniCalendar
               events={sorted}
               selectedDate={selectedDate}

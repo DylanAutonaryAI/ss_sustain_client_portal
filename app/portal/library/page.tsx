@@ -10,7 +10,7 @@ export default function LibraryPage() {
   return (
     <>
       <PortalTopbar title="Resource Library" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Resource <em className="italic" style={{ color: 'var(--accent-text)' }}>Library</em>
         </div>

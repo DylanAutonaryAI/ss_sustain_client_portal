@@ -10,7 +10,7 @@ export default function TrainingPage() {
   return (
     <>
       <PortalTopbar title="Training Clips" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Training <em className="italic" style={{ color: 'var(--accent-text)' }}>Clips</em>
         </div>
@@ -24,7 +24,7 @@ export default function TrainingPage() {
             <div className="flex items-center justify-between mb-3.5">
               <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Reference videos</span>
             </div>
-            <div className="grid grid-cols-3 gap-3 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-8">
               {trainingVideos.map((v) => (
                 <VideoCard key={v.id} tag={v.tag} title={v.title} meta={v.meta} url={v.url} />
               ))}

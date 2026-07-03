@@ -12,7 +12,7 @@ export default function SupplementsPage() {
   return (
     <>
       <PortalTopbar title="Supplements" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Supplement <em className="italic" style={{ color: 'var(--accent-text)' }}>Guide</em>
         </div>
@@ -20,7 +20,7 @@ export default function SupplementsPage() {
           The basics done consistently beat everything.
         </p>
 
-        <div className="flex gap-8 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 lg:items-start">
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-3">
               <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Essential stack</span>
@@ -29,7 +29,7 @@ export default function SupplementsPage() {
             {essential.length === 0 && <p className="text-[13px]" style={{ color: 'var(--text3)' }}>No essential supplements added.</p>}
           </div>
 
-          <div className="w-px self-stretch" style={{ background: 'var(--border)' }} />
+          <div className="hidden lg:block w-px self-stretch" style={{ background: 'var(--border)' }} />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-3">

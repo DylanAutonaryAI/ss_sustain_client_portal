@@ -83,7 +83,7 @@ export default function RevenuePage() {
   return (
     <>
       <Topbar title="Revenue" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Revenue <em className="italic" style={{ color: 'var(--accent-text)' }}>Overview</em>
         </div>
@@ -91,7 +91,7 @@ export default function RevenuePage() {
           Monthly recurring revenue, payments and trends.
         </p>
 
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard label="MRR"                  value={GBP(mrr)}         changeType="neutral" change="Active clients × current rate"          valueColor="var(--accent-text)" />
           <StatCard label="Collected this month" value={GBP(collected)}   changeType="neutral" change={`${outstandingList.length} outstanding`} valueColor="var(--accent-text)" />
           <StatCard label="Outstanding"          value={GBP(outstanding)} changeType={outstanding > 0 ? 'down' : 'neutral'} change={outstanding > 0 ? 'Chase before billing' : 'Nothing outstanding'} valueColor={outstanding > 0 ? 'var(--red)' : 'var(--accent-text)'} />
@@ -152,7 +152,7 @@ export default function RevenuePage() {
           className="rounded-xl p-6 mb-6"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
-          <div className="grid gap-2.5 items-end" style={{ gridTemplateColumns: '1fr 1fr 1fr auto' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2.5 items-end">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.8px] mb-1.5" style={{ color: 'var(--text3)' }}>Client</label>
               <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={inputStyle}>
@@ -199,6 +199,8 @@ export default function RevenuePage() {
           className="rounded-xl overflow-hidden"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
+         <div className="overflow-x-auto">
+          <div style={{ minWidth: 480 }}>
           <div
             className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
             style={{ gridTemplateColumns: '2fr 1fr 1fr', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
@@ -240,6 +242,8 @@ export default function RevenuePage() {
               No payments logged yet. Add your first one above.
             </div>
           )}
+          </div>
+         </div>
         </div>
       </div>
     </>

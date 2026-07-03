@@ -33,7 +33,7 @@ function UpcomingEventsWidget() {
         </Link>
       </div>
 
-      <div className="flex gap-4 items-start">
+      <div className="flex flex-col lg:flex-row gap-4 lg:items-start">
         {/* Event list */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">
           {upcoming.map(ev => {
@@ -91,7 +91,7 @@ function UpcomingEventsWidget() {
         </div>
 
         {/* Mini calendar */}
-        <div className="w-[240px] flex-shrink-0">
+        <div className="w-full lg:w-[240px] flex-shrink-0">
           <MiniCalendar events={allUpcoming} showLegend={false} />
         </div>
       </div>
@@ -108,7 +108,7 @@ export default function HomePage() {
   return (
     <>
       <PortalTopbar title="Home" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Good morning, <em className="italic" style={{ color: 'var(--accent-text)' }}>{firstName}.</em>
         </div>
@@ -179,7 +179,7 @@ export default function HomePage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <ResourceRow
             icon={<span style={{ fontSize: 22 }}>🏋️</span>}
             title="Training Clips"
@@ -219,7 +219,7 @@ export default function HomePage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <a
             href="https://www.loom.com/share/99d9072bf1dd438da8ab7423002d6782"
             target="_blank"

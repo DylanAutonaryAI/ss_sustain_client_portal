@@ -115,7 +115,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-[520px] rounded-[16px] overflow-hidden animate-scale-in"
+        className="w-full max-w-[520px] mx-4 max-h-[90vh] overflow-y-auto rounded-[16px] animate-scale-in"
         style={{ background: 'var(--surface)', border: '1px solid var(--border2)', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}
       >
         {/* Header */}
@@ -143,7 +143,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
 
         {/* Form */}
         <div className="px-6 py-5 flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label style={labelStyle}>Full name *</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Sarah J." style={inputStyle}
@@ -557,7 +557,7 @@ export default function ClientRosterPage() {
   return (
     <>
       <Topbar title="Client Roster" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="flex items-start justify-between mb-1.5">
           <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15]" style={{ color: 'var(--text)' }}>
             Client <em className="italic" style={{ color: 'var(--accent-text)' }}>Roster</em>
@@ -576,7 +576,7 @@ export default function ClientRosterPage() {
           All your clients — active, paused and cancelled. Click a row to edit their phase, program start, status, notes, or payment — or remove the client.
         </p>
 
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           <StatCard label="Total clients" value={String(roster.length)} valueColor="var(--accent-text)" />
           <StatCard label="Active"        value={String(active)} valueColor="var(--accent-text)" />
           <StatCard label="Pending access" value={String(pending)} valueColor={pending > 0 ? 'var(--amber)' : undefined} />
@@ -594,18 +594,21 @@ export default function ClientRosterPage() {
           className="rounded-xl overflow-hidden"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
+          <div className="overflow-x-auto" style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--border)' }}>
           <div
             className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
-            style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
+            style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', minWidth: 720, color: 'var(--text3)' }}
           >
             <div>Client</div><div>Goal</div><div>Duration</div><div>Status</div><div>Payment</div>
+          </div>
           </div>
 
           {roster.map((c, i) => (
             <div key={c.id} id={`client-${c.id}`} style={{ scrollMarginTop: 90 }}>
+              <div className="overflow-x-auto" style={{ borderBottom: '1px solid var(--border)' }}>
               <div
                 className="grid items-center px-5 py-3 cursor-pointer transition-colors duration-100"
-                style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', borderBottom: '1px solid var(--border)' }}
+                style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', minWidth: 720 }}
                 onClick={() => toggleNotes(c.id)}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg2)'; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = ''; }}
@@ -666,6 +669,7 @@ export default function ClientRosterPage() {
                 </div>
                 <div><PayTag status={c.payment} /></div>
               </div>
+              </div>
 
               {openNotes === c.id && (
                 <div className="animate-accordion">
@@ -674,7 +678,7 @@ export default function ClientRosterPage() {
                   style={{ borderBottom: i < roster.length - 1 ? '1px solid var(--border)' : 'none' }}
                 >
                   <div
-                    className="rounded-xl p-[22px] mt-1 grid grid-cols-2 gap-6"
+                    className="rounded-xl p-[22px] mt-1 grid grid-cols-1 md:grid-cols-2 gap-6"
                     style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
                   >
                     {/* Grant-access banner — only for clients still pending. The primary
@@ -774,7 +778,7 @@ export default function ClientRosterPage() {
                       <h3 className="text-[13px] font-semibold mb-2.5" style={{ color: 'var(--text)' }}>
                         About
                       </h3>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
                         <div>
                           <div className="text-[10px] font-semibold uppercase tracking-[0.5px]" style={{ color: 'var(--text3)' }}>Email</div>
                           <div style={{ color: 'var(--text)' }}>{c.email || '—'}</div>
@@ -861,7 +865,7 @@ export default function ClientRosterPage() {
                       <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
                         Active = coaching now. Paused = temporarily on hold. Cancelled = no longer a client (left the community / stopped paying).
                       </p>
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <select
                           value={getDraft(c).status}
                           onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), status: e.target.value as ClientStatus } }))}

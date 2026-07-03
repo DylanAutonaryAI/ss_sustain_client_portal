@@ -654,7 +654,7 @@ export default function ContentManagerPage() {
   return (
     <>
       <Topbar title="Content Manager" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Content <em className="italic" style={{ color: 'var(--accent-text)' }}>Manager</em>
         </div>

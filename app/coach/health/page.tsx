@@ -57,7 +57,7 @@ export default function ClientHealthPage() {
   return (
     <>
       <Topbar title="Client Health" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Client <em className="italic" style={{ color: 'var(--accent-text)' }}>Health</em>
         </div>
@@ -66,7 +66,7 @@ export default function ClientHealthPage() {
         </p>
 
         {/* Health summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <StatCard label="Healthy"  value={String(healthy)}  valueColor="var(--accent-text)" change="Score 70+" />
           <StatCard label="At risk"  value={String(atRisk)}   valueColor="var(--amber)"       change="Score 40–69" />
           <StatCard label="Critical" value={String(critical)} valueColor="var(--red)"         change="Score under 40" />
@@ -80,7 +80,7 @@ export default function ClientHealthPage() {
               return (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 px-4 py-3 rounded-[10px]"
+                  className="flex items-center flex-wrap gap-3 px-4 py-3 rounded-[10px]"
                   style={{ background: 'rgba(240,79,79,0.07)', border: '1px solid rgba(240,79,79,0.2)' }}
                 >
                   <span className="text-[13px] font-semibold flex-1" style={{ color: 'var(--red)' }}>
@@ -102,7 +102,7 @@ export default function ClientHealthPage() {
               return (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 px-4 py-3 rounded-[10px]"
+                  className="flex items-center flex-wrap gap-3 px-4 py-3 rounded-[10px]"
                   style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}
                 >
                   <span className="text-[13px] font-semibold flex-1" style={{ color: 'var(--amber)' }}>
@@ -127,6 +127,8 @@ export default function ClientHealthPage() {
           className="rounded-xl overflow-hidden mb-6"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
         >
+         <div className="overflow-x-auto">
+          <div style={{ minWidth: 680 }}>
           <div
             className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
             style={{ gridTemplateColumns: '2fr 1fr 1fr 1fr 80px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
@@ -218,6 +220,8 @@ export default function ClientHealthPage() {
           {!loading && sorted.length === 0 && (
             <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--text3)' }}>No clients yet.</div>
           )}
+          </div>
+         </div>
         </div>
 
         {/* Scoring legend */}

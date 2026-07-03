@@ -23,7 +23,7 @@ export default function RecommendationsPage() {
   return (
     <>
       <PortalTopbar title="Recommendations" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Coach <em className="italic" style={{ color: 'var(--accent-text)' }}>Recommendations</em>
         </div>
@@ -34,7 +34,7 @@ export default function RecommendationsPage() {
         {/* Gym Bag */}
         <SectionHeading>🎒 Gym Bag Essentials</SectionHeading>
         {gymBag.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
             {gymBag.map((item) => (
               <div
                 key={item.id}
@@ -60,8 +60,8 @@ export default function RecommendationsPage() {
         {/* Shopping Essentials */}
         <SectionHeading>🛒 Shopping Essentials</SectionHeading>
         {shopping.length > 0 ? (
-          <div className="rounded-xl overflow-hidden mb-8" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-            <table className="w-full text-[12px]">
+          <div className="rounded-xl overflow-x-auto mb-8" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <table className="w-full text-[12px]" style={{ minWidth: '480px' }}>
               <thead>
                 <tr style={{ background: 'var(--bg3)' }}>
                   {SHOPPING_COLS.map((col) => (

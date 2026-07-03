@@ -107,7 +107,7 @@ function EventCard({ event, highlighted }: { event: CommunityEvent; highlighted?
 
           <div className="mt-4">
             {showButtons && !decliningOpen && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11.5px] font-medium mr-1" style={{ color: 'var(--text3)' }}>
                   {changing ? 'Change response:' : 'Will you be there?'}
                 </span>
@@ -222,7 +222,7 @@ export default function CommunityPage() {
   return (
     <>
       <PortalTopbar title="Community" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           The <em className="italic" style={{ color: 'var(--accent-text)' }}>Community</em>
         </div>
@@ -255,7 +255,7 @@ export default function CommunityPage() {
         </div>
 
         {/* Two-column split */}
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
 
           {/* Left: events list */}
           <div className="flex-1 min-w-0">
@@ -297,7 +297,7 @@ export default function CommunityPage() {
           </div>
 
           {/* Right: sticky calendar */}
-          <div className="w-[270px] flex-shrink-0" style={{ position: 'sticky', top: '24px' }}>
+          <div className="w-full lg:w-[270px] flex-shrink-0 lg:sticky lg:top-6">
             <MiniCalendar
               events={upcoming}
               selectedDate={selectedDate}

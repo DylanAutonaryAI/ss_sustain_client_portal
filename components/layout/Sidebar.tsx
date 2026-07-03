@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useMobileNav } from '@/context/MobileNavContext';
 import ThemeToggle from './ThemeToggle';
 import SoundToggle from './SoundToggle';
 import SsLogo from '@/components/ui/SsLogo';
@@ -42,7 +43,11 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { open, setOpen } = useMobileNav();
   const homeHref = isCoach ? '/coach/overview' : '/portal/home';
+
+  // Mobile drawer: close whenever the route changes (a nav link was followed).
+  useEffect(() => { setOpen(false); }, [pathname, setOpen]);
 
   // Client portal only: a soft click on any button / nav link (tab change).
   // Delegated capture-phase listener, so we don't have to wire every button.
@@ -62,11 +67,23 @@ export default function Sidebar({
   }, [isCoach]);
 
   return (
+    <>
+      {/* Mobile backdrop — tap to close the drawer. Hidden at lg where the
+          sidebar is permanently docked. */}
+      {open && (
+        <div
+          className="fixed inset-0 lg:hidden"
+          style={{ background: 'rgba(0,0,0,0.5)', zIndex: 60 }}
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
     <aside
-      className="w-[220px] h-screen fixed top-0 left-0 z-60 flex flex-col"
+      className={`w-[220px] h-screen fixed top-0 left-0 flex flex-col transition-transform duration-200 ease-out ${open ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}
       style={{
         background: 'var(--sidebar-bg)',
         borderRight: '1px solid var(--border)',
+        zIndex: 70,
       }}
     >
       {/* Brand + user */}
@@ -192,5 +209,6 @@ export default function Sidebar({
         </button>
       </div>
     </aside>
+    </>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { MobileNavProvider } from '@/context/MobileNavContext';
 import CoachSidebar from '@/components/layout/CoachSidebar';
 
 // Client shell for the coach dashboard. Auth + role are enforced server-side in
@@ -17,11 +18,14 @@ export default function CoachShell({ children }: { children: React.ReactNode }) 
   }, [user, router]);
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
-      <CoachSidebar />
-      <main className="flex-1 min-h-screen" style={{ marginLeft: '220px' }}>
-        {children}
-      </main>
-    </div>
+    <MobileNavProvider>
+      <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
+        <CoachSidebar />
+        {/* Sidebar is a drawer below lg, docked (220px) at lg+ */}
+        <main className="flex-1 min-w-0 min-h-screen lg:ml-[220px]">
+          {children}
+        </main>
+      </div>
+    </MobileNavProvider>
   );
 }

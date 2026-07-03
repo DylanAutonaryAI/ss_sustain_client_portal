@@ -56,7 +56,7 @@ export default function AnalyticsPage() {
   return (
     <>
       <Topbar title="Analytics" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Portal <em className="italic" style={{ color: 'var(--accent-text)' }}>Analytics</em>
         </div>
@@ -73,7 +73,7 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard
             label="Active this week"
             value={a ? String(a.active7d) : '—'}
@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Most visited sections (real, from page_views) */}
           <div
             className="rounded-xl p-[22px]"

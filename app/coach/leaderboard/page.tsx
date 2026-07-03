@@ -82,7 +82,7 @@ export default function ReferralsPage() {
   return (
     <>
       <Topbar title="Referrals" statusLabel="Coach Dashboard" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Referral <em className="italic" style={{ color: 'var(--accent-text)' }}>Scheme</em>
         </div>
@@ -91,7 +91,7 @@ export default function ReferralsPage() {
           upfront pays now, monthly pays after 3 months. The portal tracks it; you pay by transfer and tick it off.
         </p>
 
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard label="Joined via referral" value={String(joined)} valueColor="var(--accent-text)" change={`${referrers} active referrer${referrers !== 1 ? 's' : ''}`} />
           <StatCard label="Owed now"     value={formatGBP(owedNow)}  valueColor={owedNow > 0 ? 'var(--red)' : undefined} change={owedNow > 0 ? 'Pay these out' : 'Nothing due'} changeType={owedNow > 0 ? 'down' : 'neutral'} />
           <StatCard label="Upcoming"     value={formatGBP(upcoming)} change="Held (monthly, <3mo)" />
@@ -103,6 +103,8 @@ export default function ReferralsPage() {
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Leads &amp; payouts</span>
         </div>
         <div className="rounded-xl overflow-hidden mb-8" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+         <div className="overflow-x-auto">
+          <div style={{ minWidth: 680 }}>
           <div className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
             style={{ gridTemplateColumns: '1.4fr 1.1fr 0.9fr 1.1fr 72px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}>
             <div>Friend</div><div>Referred by</div><div>Status</div><div className="text-right">£100 payout</div><div></div>
@@ -196,6 +198,8 @@ export default function ReferralsPage() {
               </div>
             </div>
           ))}
+          </div>
+         </div>
         </div>
 
         {/* Leaderboard */}

@@ -9,14 +9,14 @@ export default function MindsetPage() {
   return (
     <>
       <PortalTopbar title="Mindset" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Mindset <em className="italic" style={{ color: 'var(--accent-text)' }}>Area</em>
         </div>
         <p className="text-[13px] mb-7" style={{ color: 'var(--text2)' }}>
           The mental side of the game. Use these consistently.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {mindsetTips.map((tip, i) => (
             <div
               key={tip.id}

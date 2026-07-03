@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { ONBOARDING_TEST_MODE } from '@/lib/onboarding';
+import { MobileNavProvider } from '@/context/MobileNavContext';
 import ClientSidebar from '@/components/layout/ClientSidebar';
 import ChatWidget from '@/components/assistant/ChatWidget';
 
@@ -97,12 +98,15 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
-      <ClientSidebar />
-      <main className="flex-1 min-h-screen" style={{ marginLeft: '220px' }}>
-        {children}
-      </main>
-      <ChatWidget />
-    </div>
+    <MobileNavProvider>
+      <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
+        <ClientSidebar />
+        {/* Sidebar is a drawer below lg, docked (220px) at lg+ */}
+        <main className="flex-1 min-w-0 min-h-screen lg:ml-[220px]">
+          {children}
+        </main>
+        <ChatWidget />
+      </div>
+    </MobileNavProvider>
   );
 }

@@ -16,7 +16,7 @@ export default function PosingPage() {
   return (
     <>
       <PortalTopbar title="Posing Area" />
-      <div className="px-8 py-7">
+      <div className="px-4 md:px-8 py-6 md:py-7">
         <div className="font-serif text-[30px] tracking-[-0.5px] leading-[1.15] mb-1.5" style={{ color: 'var(--text)' }}>
           Posing <em className="italic" style={{ color: 'var(--accent-text)' }}>Area</em>
         </div>
@@ -29,7 +29,7 @@ export default function PosingPage() {
             <div className="flex items-center justify-between mb-3.5">
               <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Pose tutorials</span>
             </div>
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
               {posingVideos.map((v) => {
                 const videoId = extractYouTubeId(v.youtubeUrl);
                 return (
