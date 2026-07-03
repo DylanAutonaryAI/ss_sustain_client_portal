@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { withTimeout } from '@/lib/with-timeout';
 import SsLogo from '@/components/ui/SsLogo';
 import LoginSplash from '@/components/ui/LoginSplash';
 import { primeAudio } from '@/lib/sound';
@@ -24,22 +25,48 @@ export default function LoginPage() {
     setError('');
     primeAudio(); // unlock audio inside the click gesture so the splash swoosh can play
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setError('Incorrect email or password. Try again.');
+    // Belt-and-braces: every await in this flow is raced against a timeout so a
+    // wedged request can never pin the button on "Signing in…" — surface an
+    // error instead.
+    try {
+      const { error } = await withTimeout(supabase.auth.signInWithPassword({ email, password }), 15000);
+      if (error) {
+        setError('Incorrect email or password. Try again.');
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError('Sign-in timed out. Check your connection and try again.');
       setLoading(false);
       return;
     }
 
-    // Use security-definer RPC to bypass RLS and get role reliably
-    const { data: role } = await supabase.rpc('get_my_role');
+    // Role check via the SERVER — /api/me validates the cookies that
+    // signInWithPassword just wrote. Deliberately NOT a browser-client query
+    // (rpc/getSession): those can hang on the client's token machinery and
+    // wedged this button before (see the note in AuthContext). The json() read
+    // is INSIDE the race (a stalled body would otherwise hang unbounded).
+    // /api/me returns non-2xx for transient failures — treated like a network
+    // error: fall back to the selected tab, since the server route guards
+    // re-validate the role on navigation anyway. A 200 with role null means the
+    // account genuinely has no role assigned → the mismatch gate handles it.
+    let role: string | null = tab;
+    try {
+      const data = await withTimeout(
+        fetch('/api/me', { cache: 'no-store' }).then((r) => {
+          if (!r.ok) throw new Error('me-unavailable');
+          return r.json();
+        }),
+        8000,
+      );
+      role = data?.user?.role ?? null;
+    } catch { /* fall back to the tab; server guards re-check */ }
 
     // Enforce that the selected tab matches the account's actual role —
     // clients sign in under "Client", coaches under "Coach". On a mismatch,
     // sign back out so they can't bypass the gate by navigating directly.
     if (role !== tab) {
-      await supabase.auth.signOut();
+      await withTimeout(supabase.auth.signOut(), 2500).catch(() => {});
       setLoading(false);
       if (role === 'coach' && tab === 'client') {
         setError('That’s a coach account — switch to the Coach tab to sign in.');
@@ -68,17 +95,25 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    });
-    setLoading(false);
-
-    if (error && /rate|limit|seconds/i.test(error.message)) {
-      setError('Too many requests — wait a minute and try again.');
-      return;
+    // Same wedge class as sign-in: race against a timeout so the button can't stick.
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        }),
+        10000,
+      );
+      setLoading(false);
+      if (error && /rate|limit|seconds/i.test(error.message)) {
+        setError('Too many requests — wait a minute and try again.');
+        return;
+      }
+      // Don't reveal whether an account exists — always confirm.
+      setResetSent(true);
+    } catch {
+      setLoading(false);
+      setError('Request timed out — check your connection and try again.');
     }
-    // Don't reveal whether an account exists — always confirm.
-    setResetSent(true);
   }
 
   function goReset() { setMode('reset'); setError(''); setResetSent(false); }

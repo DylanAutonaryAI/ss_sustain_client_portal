@@ -13,6 +13,11 @@ export default async function PortalLayout({ children }: { children: React.React
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
+  // Coaches are bounced to their dashboard. A null role is deliberately ALLOWED
+  // here (unlike the coach layout, which fails closed): the portal is the
+  // least-privileged area, every portal API re-validates + scopes to the caller,
+  // and bouncing null to /login would lock real clients out on a transient
+  // get_my_role blip.
   const { data: role } = await supabase.rpc('get_my_role');
   if (role === 'coach') redirect('/coach/overview');
 

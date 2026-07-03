@@ -3,7 +3,7 @@ import { createBrowserClient } from '@supabase/ssr';
 // No-op auth lock: run every auth operation immediately without acquiring any
 // cross-call lock. BOTH the default navigator.locks AND processLock deadlocked
 // here — getSession() / get_my_role would grab the lock, hang, and never release,
-// so loadProfile never finished and the profile stayed empty ("Hello there").
+// so the profile load never finished and the UI stayed empty ("Hello there").
 // With no lock there is nothing to deadlock on. The token is fresh right after
 // login so there's no refresh to race, and this is a single-session browser app.
 const noLock = <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn();

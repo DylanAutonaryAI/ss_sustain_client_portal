@@ -63,15 +63,19 @@ function buildMockUser(d: MeResponse): MockUser {
 // validates the access token directly and never depends on the browser's
 // client-side refresh-token grant (which can fail after the API-key migration),
 // so this recovers the profile even when the browser client can't read/refresh
-// the session. Returns null only when the server agrees there's no session.
-async function fetchMe(): Promise<MockUser | null> {
+// the session. Tri-state result:
+//   MockUser  — valid session
+//   null      — the server POSITIVELY confirmed there is no session
+//   undefined — indeterminate (network error / 503) — callers must NOT treat
+//               this as signed-out, or a transient blip wipes a live profile.
+async function fetchMe(): Promise<MockUser | null | undefined> {
   try {
     const res = await fetch('/api/me', { cache: 'no-store' });
-    if (!res.ok) return null;
+    if (!res.ok) return undefined;
     const { user } = await res.json();
     return user ? buildMockUser(user) : null;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -114,7 +118,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // the fallback unreached and the user stuck as "Good morning, there."
         try {
           const me = await fetchMe();
-          if (me) setUser(me); else { setUser(null); setSupabaseUser(null); }
+          if (me) setUser(me);
+          else if (me === null) { setUser(null); setSupabaseUser(null); }
+          // undefined (indeterminate) → leave state as-is; don't fabricate a signed-out.
         } finally {
           clearTimeout(safety);
           setLoading(false);
@@ -126,68 +132,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })();
     }
 
-    // Listen for auth changes. A FAILED background token refresh also fires
-    // SIGNED_OUT, so before wiping the profile, re-check server-side: if the
-    // access token still validates (/api/me returns a user), it was just a
-    // client refresh hiccup — keep the user. Only clear when the server agrees
-    // there's no session (a genuine sign-out clears the cookies, so /api/me
-    // returns null and we clear).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        if (session?.user) {
-          await loadProfile(session.user);
-        } else if (event === 'SIGNED_OUT') {
-          const me = await fetchMe();
+    // Listen for auth changes. CRITICAL: auth-js AWAITS every onAuthStateChange
+    // callback inside signInWithPassword before it returns (GoTrueClient
+    // _notifyAllSubscribers awaits each subscriber) — so this callback must
+    // NEVER await anything that can stall. Awaiting a browser-client query here
+    // is what wedged the login button on "Signing in…". Kick work off
+    // fire-and-forget and return immediately.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        // Refresh the profile from the server route (reliable path); no await.
+        void fetchMe().then((me) => { if (me) setUser(me); });
+      } else if (event === 'SIGNED_OUT') {
+        // A FAILED background token refresh also fires SIGNED_OUT — re-check
+        // server-side before wiping: if the access token still validates, keep
+        // the user; only clear when the server POSITIVELY confirms no session
+        // (fetchMe === null). Indeterminate (undefined) keeps the current state.
+        void fetchMe().then((me) => {
           if (me) setUser(me);
-          else { setUser(null); setSupabaseUser(null); }
-        }
-      } catch {
-        /* keep current state — don't wipe the profile on a transient error */
+          else if (me === null) { setUser(null); setSupabaseUser(null); }
+        });
       }
     });
 
     return () => { clearTimeout(safety); subscription.unsubscribe(); };
   }, []);
 
-  async function loadProfile(sbUser: User) {
-    setSupabaseUser(sbUser);
-    const fallbackName = sbUser.email?.split('@')[0] || 'User';
-
-    // Resolve role + profile INDEPENDENTLY and defensively. loadProfile runs
-    // concurrently (getSession + onAuthStateChange), so a transient failure on
-    // either query must never blank the user back to null — that race is what
-    // made a logged-in client intermittently flash "Hello there". Worst case we
-    // fall back to the email name + the previously-known role; real logout is
-    // handled by the SIGNED_OUT event, not by a query error here.
-    let resolvedRole: UserRole | null = null;
-    try {
-      const { data } = await supabase.rpc('get_my_role');
-      if (data === 'coach' || data === 'client') resolvedRole = data;
-    } catch { /* transient — keep going */ }
-
-    let profile: { full_name?: string | null; avatar_url?: string | null; nickname?: string | null } | null = null;
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url, nickname')
-        .eq('id', sbUser.id)
-        .maybeSingle();
-      profile = data;
-    } catch { /* transient — keep going */ }
-
-    const name = profile?.full_name || fallbackName;
-    setUser((prev) => ({
-      role: resolvedRole ?? prev?.role ?? 'client',
-      name,
-      initials: getInitials(name),
-      avatarUrl: profile?.avatar_url || undefined,
-      nickname: profile?.nickname || undefined,
-    }));
-  }
-
   // Re-read the profile after a settings save so the sidebar avatar / nickname
   // update without a full reload. Uses the server route (reliable; immune to the
-  // browser's broken token refresh) rather than getSession()+loadProfile.
+  // browser's broken token refresh) — never a browser-client query.
   const refreshProfile = async () => {
     const me = await fetchMe();
     if (me) setUser(me);

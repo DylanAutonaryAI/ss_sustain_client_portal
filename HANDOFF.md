@@ -185,6 +185,27 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
     until ids are non-null/non-empty, so an empty fetch doesn't "lock in" emptiness.
   - **Logout no longer needs to clear it** — there's no per-browser state to nuke. The
     abandoned `ss-seen-v1` localStorage key from old sessions is harmless and unused.
+- **2026-05-29 (late) — Login stuck on "Signing in…" CRACKED (verified vs the installed SDK,
+  then adversarially reviewed by a 3-agent workflow before shipping).**
+  - **Mechanism (verified, not guessed):** auth-js `signInWithPassword` AWAITS
+    `_notifyAllSubscribers('SIGNED_IN')` before returning (GoTrueClient.js:850), and that
+    awaits EVERY `onAuthStateChange` callback (:3954-62). Our subscriber awaited
+    `loadProfile()` → browser `get_my_role` rpc → the call class that hangs post-migration →
+    **sign-in succeeded on the network but `signInWithPassword` never returned**. The login
+    page's own browser `get_my_role` await was a second wedge point.
+  - **Fix:** subscriber is now fire-and-forget (never awaits); `loadProfile` DELETED —
+    AuthContext does zero browser DB queries; login's role check now hits `/api/me` (reads
+    the cookies sign-in just wrote), with the json read inside an 8s race and a 15s race on
+    sign-in itself; `lib/with-timeout.ts` shared helper; same-class timeout added to
+    forgot-password. (Settings password-change was independently fixed on the other machine
+    via the server route `/api/profile/password` — that version was kept.)
+  - **Hardening from the adversarial review:** `/api/me` now returns **503 on transient
+    getUser/rpc failures** vs 200 `{user:null}` only when the server POSITIVELY confirms
+    no session (so a blip can't sign a real client out with "no portal access"); `fetchMe`
+    is tri-state and only a definitive null clears state; **coach layout now FAILS CLOSED**
+    (`role !== 'coach'` → `/portal/home`) while the portal layout deliberately tolerates a
+    null role (least privilege; a blip can't lock a client out).
+  - See the **AUTH INVARIANTS** in Watch out before touching any of this.
 - **2026-05-29 — Auth "Good morning, there." / no-name bug CRACKED + route protection back.**
   The recurring bug: a logged-in client rendered the null-user fallbacks ("there",
   sidebar "Client"/"Active client"/"??") even though the server session was valid (Settings
@@ -488,13 +509,22 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   site goes down. **Route protection is now reinstated server-side** via the
   `app/portal/layout.tsx` + `app/coach/layout.tsx` **server components** (Node runtime,
   `getUser` + `get_my_role` + `redirect`), NOT edge middleware — keep it that way.
-- **Auth/profile loads from `/api/me` (server, admin read) — do NOT make AuthContext depend
-  on the browser `getSession()`/`getUser()` for the initial profile.** That browser path
-  triggers a token refresh that can fail/hang under the new keys, which caused the
-  "Good morning, there." bug. `context/AuthContext.tsx` populates `user` from `/api/me`
-  first; `/api/me` reads the profile with the service-role client. If you refactor auth,
-  preserve this — and `loadProfile`/`refreshProfile` must never null a logged-in user on a
-  transient/refresh error.
+- **AUTH INVARIANTS (hard-won — preserve all three if you touch auth):**
+  1. **AuthContext performs ZERO browser-client DB queries.** The profile comes from
+     `GET /api/me` (server `getUser()` + service-role profile read). Tri-state contract:
+     200 `{user}` = session; 200 `{user:null}` = POSITIVELY no session; **503 = transient,
+     treat as unknown — never as signed-out** (`fetchMe()` returns `undefined` for it, and
+     only a definitive `null` clears the in-memory user).
+  2. **`onAuthStateChange` callbacks must NEVER await anything.** auth-js AWAITS every
+     subscriber inside `signInWithPassword` (GoTrueClient `_notifyAllSubscribers`) before it
+     returns — an awaited slow/hung call there is what wedged the login button on
+     "Signing in…". Fire-and-forget only.
+  3. **Every browser-client auth call behind a button is raced with `withTimeout`**
+     (`lib/with-timeout.ts`): login 15s, /api/me 8s (json read INSIDE the race), reset 10s,
+     mismatch signOut 2.5s. (Settings password-change avoids the browser client entirely —
+     server route `/api/profile/password` + 15s AbortController.) The browser token machinery
+     can hang under the new keys; a timeout + error beats a stuck spinner. (`loadProfile` no
+     longer exists — it was the wedge and was deleted.)
 - **Page transitions must stay opacity-only.** `template.tsx` uses `animate-page` (fade,
   no transform). A `transform` on those wrappers becomes the containing block for any
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
@@ -517,3 +547,5 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 ---
 
 **Last updated:** 2026-06-04 — **Stripe sandbox flow verified end-to-end** with a real test purchase (£185, card `4242…`): `checkout.session.completed` → pending client appeared in the roster within seconds. Roster follow-up: every row now shows email under the name, a "via Stripe" chip on Stripe rows, and the expanded row has a new **About** block (email, phone/WhatsApp w/ click-to-WhatsApp, birthday, last login, phase·week, member since) plus a **Stripe — Subscription details** block (customer/sub IDs + Open in Stripe deep-link, Stripe rows only). Phone is editable inline. **One pending action: run `db/2026-06-04_client_phone.sql`.** Then ready to repeat the Stripe setup in LIVE mode for real clients. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
+
+**Plus (rebased in on top):** the **login "Signing in…" wedge is cracked** — auth-js awaits `onAuthStateChange` subscribers inside `signInWithPassword`; the subscriber is now fire-and-forget, the login role check goes via `/api/me`, and every auth call behind a button is timeout-raced. **See the AUTH INVARIANTS in Watch out before touching auth.**
