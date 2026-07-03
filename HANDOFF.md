@@ -50,21 +50,25 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — welcome video embedded (2026-07-03), portal-walkthrough video still pending
-**Onboarding welcome video (step 1) is DONE.** Sam sent it as an **mp4** (not a Loom),
-added at `public/images/sssustain welcome video.mp4` (114MB HEVC/1080p50 master). That
-master is **gitignored** (GitHub rejects >100MB; browsers can't play HEVC), and a
-web-ready copy `public/images/welcome-video.mp4` (23.6MB, H.264/AAC, `+faststart`) was
-re-encoded with ffmpeg and **is committed**. `lib/onboarding.ts` step `welcome` now
-points `url` at `/images/welcome-video.mp4` (placeholder flag removed, duration → 1 min).
-`app/onboarding/page.tsx` gained an `isLocalVideo` path: any step `url` that starts `/`
-and ends `.mp4` renders in a native `<video controls>` (vs the Loom iframe path).
-Verified against a production build + `next start`: onboarding page 200, video serves
-`video/mp4` with `Accept-Ranges: bytes` and a range request returns 206. **The only
-onboarding content blocker left is Sam's "How to use your portal" walkthrough video
-(step 2, still a placeholder).** If that also arrives as an mp4, repeat the recipe
-(ffmpeg H.264 CRF 22 / 25fps / AAC 128k / `+faststart`, commit the small copy, gitignore
-the master).
+## 🟢 Active — BOTH onboarding videos now embedded (2026-07-03), no content blockers left
+**Onboarding steps 1 (welcome) and 2 (portal walkthrough) are BOTH DONE.** Sam sent
+each as an **mp4** (not a Loom). Both masters are HEVC (browsers can't play HEVC) and
+were re-encoded to committed, web-ready H.264 copies; the masters are **gitignored**:
+- Step 1 `welcome` → `/images/welcome-video.mp4` (23.6MB). Master
+  `public/images/sssustain welcome video.mp4` gitignored.
+- Step 2 `portal-tour` → `/images/portal-walkthrough-video.mp4` (12.8MB, ~4:49,
+  duration label "5 min"). Master `public/images/sam portal walkthrough.mp4` gitignored.
+  Note: source was 2010×1080 (odd width) — the re-encode forces even dims via
+  `scale=trunc(iw/2)*2:trunc(ih/2)*2` so H.264 `yuv420p` is happy.
+Both play through the `isLocalVideo` path in `app/onboarding/page.tsx` (any step `url`
+starting `/` and ending `.mp4` → native `<video controls>`; the Loom-iframe path is
+untouched). Verified on a production build + `next start`: onboarding 200, walkthrough
+serves `video/mp4` (12.8MB) with `Accept-Ranges: bytes`, range request → 206.
+**All onboarding content blockers are now cleared.** Remaining before go-live is
+operational only: flip `ONBOARDING_TEST_MODE` → false in `lib/onboarding.ts` + remove
+the admin skip button; optionally wire the completion email to Sam.
+Recipe for any future Sam mp4: ffmpeg H.264 CRF 22–23 / 25fps / AAC 128k / `+faststart`
+(+ even-dims scale filter if the source is odd), commit the small copy, gitignore the master.
 
 ---
 

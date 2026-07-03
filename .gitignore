@@ -38,6 +38,8 @@ next-env.d.ts
 # Claude Code local settings (per-machine, not shared)
 .claude/settings.local.json
 
-# Raw video masters — too big for GitHub (>100MB). The web-ready compressed
-# versions (e.g. welcome-video.mp4) ARE committed; keep originals out of git.
+# Raw video masters — HEVC/oversized originals from Sam. The web-ready compressed
+# H.264 versions (welcome-video.mp4, portal-walkthrough-video.mp4) ARE committed;
+# keep these originals out of git.
 public/images/sssustain welcome video.mp4
+public/images/sam portal walkthrough.mp4

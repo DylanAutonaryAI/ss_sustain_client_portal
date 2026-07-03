@@ -47,9 +47,11 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'portal-tour',
     type: 'video',
     title: 'How to use your portal',
-    duration: '3 min',
+    duration: '5 min',
     description: 'A quick tour of your portal — where to find your training clips, posing, supplements, webinars, recommendations and more. This is your home base, so get familiar with where everything lives.',
-    placeholder: true, // TODO(Sam): portal walkthrough Loom URL — Sam will record this
+    // Self-hosted mp4 (native <video>). Compressed web copy — the HEVC master is
+    // gitignored in public/images.
+    url: '/images/portal-walkthrough-video.mp4',
   },
   {
     id: 'onefit',
