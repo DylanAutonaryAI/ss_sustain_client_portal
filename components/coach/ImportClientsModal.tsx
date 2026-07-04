@@ -3,15 +3,44 @@
 import { useMemo, useRef, useState } from 'react';
 
 // Bulk-import existing clients into the roster from a pasted list or a .csv.
-// Columns in order: name, email, phone?, goal?, monthly amount?, next-due (YYYY-MM-DD)?
-// A header row (containing "email") is auto-detected and skipped. Shows a live
-// preview with per-row validation before anything is sent; on confirm it POSTs
-// to /api/clients/import, which creates each as PENDING + skip-onboarding.
+// HEADER-AWARE: if the first row is a header (has recognisable column names) the
+// columns are mapped BY NAME in any order — so "Client Name, Phone, Email, Phase"
+// works exactly as-is. Without a header it falls back to positional order
+// (name, email, phone, goal, monthly £, next-due). Shows a live preview with
+// per-row validation; on confirm POSTs to /api/clients/import (PENDING clients).
 
 interface ParsedRow { full_name: string; email: string; phone: string; goal: string; amount: string; nextDue: string; valid: boolean; reason?: string }
 
+type Field = 'full_name' | 'email' | 'phone' | 'goal' | 'amount' | 'nextDue';
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Header labels we recognise for each field (matched case-insensitively, after
+// stripping £/() and spaces). Order-independent: we map by whichever column
+// carries a matching header.
+const HEADER_ALIASES: Record<Field, string[]> = {
+  full_name: ['name', 'clientname', 'fullname', 'client'],
+  email:     ['email', 'emailaddress', 'e-mail'],
+  phone:     ['phone', 'phonenumber', 'mobile', 'whatsapp', 'number', 'contact', 'tel'],
+  goal:      ['goal', 'phase', 'plan', 'focus'],
+  amount:    ['amount', 'monthly', 'monthlyamount', 'rate', 'price', 'fee', 'monthly£', '£/mo', 'permonth'],
+  nextDue:   ['nextdue', 'due', 'duedate', 'nextpayment', 'nextpaymentdue', 'renewal', 'renews'],
+};
+
+const normHeader = (s: string) => s.trim().toLowerCase().replace(/[£()]/g, '').replace(/\s+/g, '');
+
+// If the row's cells look like column headers, return field→index; else null.
+function detectHeaderMap(cells: string[]): Partial<Record<Field, number>> | null {
+  const norm = cells.map(normHeader);
+  const map: Partial<Record<Field, number>> = {};
+  for (const field of Object.keys(HEADER_ALIASES) as Field[]) {
+    const idx = norm.findIndex((h) => HEADER_ALIASES[field].includes(h));
+    if (idx !== -1) map[field] = idx;
+  }
+  // Only treat row 1 as a header if it named at least the two required columns.
+  return map.full_name != null && map.email != null ? map : null;
+}
 
 // Split one CSV line respecting simple double-quoted fields.
 function splitLine(line: string): string[] {
@@ -34,21 +63,29 @@ function splitLine(line: string): string[] {
 function parse(text: string, existingEmails: Set<string>): ParsedRow[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return [];
-  // Drop a header row only when the first line is NOT a real data row — i.e. its
-  // second cell isn't a valid email. This avoids eating a genuine first client
-  // whose email happens to contain "name"/"email" (e.g. rename.io, myname@…).
+
   const firstCells = splitLine(lines[0]);
-  const start = EMAIL_RE.test(firstCells[1] ?? '') ? 0 : 1;
+  const headerMap = detectHeaderMap(firstCells);
+  // With a header → map by name and skip row 1. Without → positional, and drop
+  // row 1 only if it isn't itself a data row (a valid email in the 2nd cell).
+  const posMap: Record<Field, number> = { full_name: 0, email: 1, phone: 2, goal: 3, amount: 4, nextDue: 5 };
+  const colMap = headerMap ?? posMap;
+  const start = headerMap ? 1 : (EMAIL_RE.test(firstCells[1] ?? '') ? 0 : 1);
+
+  const cellFor = (cells: string[], f: Field) => {
+    const i = colMap[f];
+    return i != null ? (cells[i] ?? '') : '';
+  };
 
   const seen = new Set<string>();
   return lines.slice(start).map((line) => {
     const cells = splitLine(line);
-    const full_name = cells[0] ?? '';
-    const email = cells[1] ?? '';
-    const phone = cells[2] ?? '';
-    const goal = cells[3] ?? '';
-    const amount = (cells[4] ?? '').replace(/[£,\s]/g, '');
-    const nextDue = (cells[5] ?? '').trim();
+    const full_name = cellFor(cells, 'full_name').trim();
+    const email = cellFor(cells, 'email').trim();
+    const phone = cellFor(cells, 'phone').replace(/\s+/g, ' ').trim();
+    const goal = cellFor(cells, 'goal').trim();
+    const amount = cellFor(cells, 'amount').replace(/[£,\s]/g, '');
+    const nextDue = cellFor(cells, 'nextDue').trim();
     const emailLc = email.toLowerCase();
     let valid = true;
     let reason: string | undefined;
@@ -176,12 +213,12 @@ export default function ImportClientsModal({
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 rows={6}
-                placeholder={'Name, Email, Phone, Goal, Monthly £, Next due (YYYY-MM-DD)\nSarah Jones, sarah@example.com, +447700900123, Fat loss, 185, 2026-08-01\nTom Smith, tom@example.com, , , 150'}
+                placeholder={'Client Name, Phone Number, Email, Phase\nOllie Turner, +44 7805 732687, oliverj_8@hotmail.com, Fat loss\nMax North, +44 7498 859385, max-north@hotmail.co.uk, Fat loss'}
                 className="w-full rounded-[10px] px-3 py-2.5 text-[12px] outline-none resize-y font-mono leading-[1.6]"
                 style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
               />
               <p className="text-[11px]" style={{ color: 'var(--text3)' }}>
-                Columns in order: <strong>Name, Email</strong>, then optional Phone, Goal, <strong>Monthly £</strong> (feeds MRR) and <strong>Next due</strong> (YYYY-MM-DD, sets the payment status). A header row is skipped automatically.
+                <strong>Include a header row</strong> and columns can be in any order — recognised names: <strong>Name</strong>, <strong>Email</strong> (both required), plus optional <strong>Phone</strong>, <strong>Phase/Goal</strong>, <strong>Monthly £</strong> (feeds MRR) and <strong>Next due</strong> (YYYY-MM-DD). Copy straight from your spreadsheet with its header and paste. (No header → columns read in order: Name, Email, Phone, Goal, £, Due.)
               </p>
 
               {/* Onboarding toggle */}
