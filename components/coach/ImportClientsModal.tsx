@@ -31,15 +31,60 @@ const HEADER_ALIASES: Record<Field, string[]> = {
 const normHeader = (s: string) => s.trim().toLowerCase().replace(/[£()]/g, '').replace(/\s+/g, '');
 
 // If the row's cells look like column headers, return field→index; else null.
+// Matches a header when it CONTAINS an alias keyword (so "Mobile Number",
+// "Email Address" etc. resolve), taking the first field that matches each column.
 function detectHeaderMap(cells: string[]): Partial<Record<Field, number>> | null {
   const norm = cells.map(normHeader);
   const map: Partial<Record<Field, number>> = {};
   for (const field of Object.keys(HEADER_ALIASES) as Field[]) {
-    const idx = norm.findIndex((h) => HEADER_ALIASES[field].includes(h));
-    if (idx !== -1) map[field] = idx;
+    const idx = norm.findIndex((h) => h !== '' && HEADER_ALIASES[field].some((a) => h.includes(a)));
+    if (idx !== -1 && !Object.values(map).includes(idx)) map[field] = idx;
   }
   // Only treat row 1 as a header if it named at least the two required columns.
   return map.full_name != null && map.email != null ? map : null;
+}
+
+const looksLikePhone = (s: string) => /^\+?[\d][\d ()\-.]{6,}$/.test(s.trim()) && s.replace(/\D/g, '').length >= 7;
+
+// No header → infer which column is which by looking at the VALUES across ALL
+// data rows (not just the first — a blank cell in row 1 must not unmap a column
+// for everyone). email = the column where the most rows hold a valid email;
+// phone = the column (≠ email) where the most rows look phone-shaped; name = the
+// first remaining column with alphabetic (non-numeric) values; goal = the leftover.
+function inferColMapMulti(rows: string[][]): Partial<Record<Field, number>> | null {
+  const cols = Math.max(0, ...rows.map((r) => r.length));
+  if (cols === 0) return null;
+  const emailHits = new Array(cols).fill(0);
+  const phoneHits = new Array(cols).fill(0);
+  for (const r of rows) {
+    for (let i = 0; i < cols; i++) {
+      const v = (r[i] ?? '').trim();
+      if (EMAIL_RE.test(v)) emailHits[i]++;
+      else if (looksLikePhone(v)) phoneHits[i]++;
+    }
+  }
+  const argmax = (arr: number[], skip = -1) => {
+    let bi = -1, bv = 0;
+    for (let i = 0; i < arr.length; i++) if (i !== skip && arr[i] > bv) { bv = arr[i]; bi = i; }
+    return bi;
+  };
+  const emailIdx = argmax(emailHits);
+  if (emailIdx === -1) return null; // no email column anywhere → can't infer
+  const map: Partial<Record<Field, number>> = { email: emailIdx };
+  const phoneIdx = argmax(phoneHits, emailIdx);
+  if (phoneIdx !== -1) map.phone = phoneIdx;
+  const used = new Set<number>([emailIdx, phoneIdx].filter((i) => i >= 0));
+  // name = first unused column with a letter-containing, non-pure-number value.
+  for (let i = 0; i < cols; i++) {
+    if (used.has(i)) continue;
+    if (rows.some((r) => /[a-zA-Z]/.test(r[i] ?? '') && !/^\s*\d+\s*$/.test(r[i] ?? ''))) { map.full_name = i; used.add(i); break; }
+  }
+  // goal = next unused non-empty column.
+  for (let i = 0; i < cols; i++) {
+    if (used.has(i)) continue;
+    if (rows.some((r) => (r[i] ?? '').trim() !== '')) { map.goal = i; break; }
+  }
+  return map.full_name != null ? map : null;
 }
 
 // Split one CSV line respecting simple double-quoted fields.
@@ -66,11 +111,23 @@ function parse(text: string, existingEmails: Set<string>): ParsedRow[] {
 
   const firstCells = splitLine(lines[0]);
   const headerMap = detectHeaderMap(firstCells);
-  // With a header → map by name and skip row 1. Without → positional, and drop
-  // row 1 only if it isn't itself a data row (a valid email in the 2nd cell).
   const posMap: Record<Field, number> = { full_name: 0, email: 1, phone: 2, goal: 3, amount: 4, nextDue: 5 };
-  const colMap = headerMap ?? posMap;
-  const start = headerMap ? 1 : (EMAIL_RE.test(firstCells[1] ?? '') ? 0 : 1);
+
+  let colMap: Partial<Record<Field, number>>;
+  let dataLines: string[];
+  if (headerMap) {
+    // Recognised header row → map by column name, skip the header.
+    colMap = headerMap;
+    dataLines = lines.slice(1);
+  } else {
+    // No header → row 0 is data if it holds an email; otherwise it's an
+    // unrecognised header, so drop it. Infer columns by VALUE across ALL data
+    // rows so a blank cell in the first row can't unmap a column. Falls back to
+    // positional order if no email column is found anywhere.
+    const row0IsData = firstCells.some((c) => EMAIL_RE.test(c.trim()));
+    dataLines = row0IsData ? lines : lines.slice(1);
+    colMap = inferColMapMulti(dataLines.map(splitLine)) ?? posMap;
+  }
 
   const cellFor = (cells: string[], f: Field) => {
     const i = colMap[f];
@@ -78,10 +135,13 @@ function parse(text: string, existingEmails: Set<string>): ParsedRow[] {
   };
 
   const seen = new Set<string>();
-  return lines.slice(start).map((line) => {
+  return dataLines.map((line) => {
     const cells = splitLine(line);
     const full_name = cellFor(cells, 'full_name').trim();
-    const email = cellFor(cells, 'email').trim();
+    // Per-row email recovery: if a ragged row shifted the columns, still find the
+    // email wherever it landed rather than rejecting a valid client.
+    let email = cellFor(cells, 'email').trim();
+    if (!EMAIL_RE.test(email)) { const e = cells.find((c) => EMAIL_RE.test(c.trim())); if (e) email = e.trim(); }
     const phone = cellFor(cells, 'phone').replace(/\s+/g, ' ').trim();
     const goal = cellFor(cells, 'goal').trim();
     const amount = cellFor(cells, 'amount').replace(/[£,\s]/g, '');
@@ -218,7 +278,7 @@ export default function ImportClientsModal({
                 style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
               />
               <p className="text-[11px]" style={{ color: 'var(--text3)' }}>
-                <strong>Include a header row</strong> and columns can be in any order — recognised names: <strong>Name</strong>, <strong>Email</strong> (both required), plus optional <strong>Phone</strong>, <strong>Phase/Goal</strong>, <strong>Monthly £</strong> (feeds MRR) and <strong>Next due</strong> (YYYY-MM-DD). Copy straight from your spreadsheet with its header and paste. (No header → columns read in order: Name, Email, Phone, Goal, £, Due.)
+                <strong>Columns can be in any order</strong>, with or without a header row — it finds the name, email, phone and phase automatically. Just <strong>Name</strong> and <strong>Email</strong> are required. To also set payment info on import, include a header row with <strong>Monthly £</strong> and/or <strong>Next due</strong> (YYYY-MM-DD) columns. Copy straight from your spreadsheet and paste.
               </p>
 
               {/* Onboarding toggle */}

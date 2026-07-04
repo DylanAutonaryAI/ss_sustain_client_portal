@@ -166,16 +166,19 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   const nextPaymentDate = periodEndIsoDate(sub);
 
-  // Monthly rate (GBP) from the subscription's price, so MRR counts Stripe
-  // clients the same way as manually-tracked ones. Only trust it for a monthly
-  // GBP price — an annual/weekly price or a non-GBP currency would be mis-scaled,
-  // so leave it null and fall back to the payment ledger instead.
+  // Per-payment amount (installment) + billing interval from the subscription's
+  // price, so MRR counts Stripe clients the same way as manually-tracked ones.
+  // Supports monthly and annual GBP prices (interval_count months); anything else
+  // (non-GBP, weekly, etc.) leaves the amount null → falls back to the ledger.
   const price = sub.items?.data?.[0]?.price;
-  const isMonthlyGbp =
-    price?.currency === 'gbp' &&
-    price?.recurring?.interval === 'month' &&
-    (price?.recurring?.interval_count ?? 1) === 1;
-  const monthlyAmount = isMonthlyGbp && price?.unit_amount != null ? price.unit_amount / 100 : null;
+  const intervalUnit = price?.recurring?.interval;           // 'month' | 'year' | ...
+  const intervalCount = price?.recurring?.interval_count ?? 1;
+  const billingIntervalMonths =
+    intervalUnit === 'month' ? intervalCount :
+    intervalUnit === 'year' ? intervalCount * 12 : null;
+  const supported = price?.currency === 'gbp' && billingIntervalMonths != null && [1, 3, 6, 12].includes(billingIntervalMonths);
+  const monthlyAmount = supported && price?.unit_amount != null ? price.unit_amount / 100 : null; // the installment
+  const intervalToStore = supported ? billingIntervalMonths! : 1;
 
   // Stripe Payment Links collect phone only when the merchant enables it; when
   // present it's an E.164 string. Defensively read it either way — surfaces in
@@ -193,14 +196,17 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     .is('stripe_subscription_id', null)
     .maybeSingle();
   if (manualRow) {
+    // Only overwrite the rate/interval when we actually derived one from a
+    // supported price — never null out a rate the coach already entered manually.
+    const rateFields = supported ? { monthly_amount: monthlyAmount, billing_interval_months: intervalToStore } : {};
     const { error: linkErr } = await admin
       .from('clients')
       .update({
         stripe_customer_id: customerId,
         stripe_subscription_id: subscriptionId,
         next_payment_date: nextPaymentDate,
-        monthly_amount: monthlyAmount,
         status: 'Active',
+        ...rateFields,
       })
       .eq('id', manualRow.id);
     if (linkErr) throw new Error(`Failed to link Stripe to existing client: ${linkErr.message}`);
@@ -217,6 +223,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     status: 'Active',
     next_payment_date: nextPaymentDate,
     monthly_amount: monthlyAmount,
+    billing_interval_months: intervalToStore,
     notes: null,
     since: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     referral_code: generateReferralCode(fullName),

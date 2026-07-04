@@ -410,7 +410,7 @@ export default function ClientRosterPage() {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openNotes, setOpenNotes] = useState<string | null>(null);
-  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string; phone: string; monthlyAmount: string }>>({});
+  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string; phone: string; monthlyAmount: string; billingInterval: number }>>({});
   const [payingId, setPayingId]   = useState<string | null>(null);
   const [customPhase, setCustomPhase] = useState<Record<string, boolean>>({});
   const [saved, setSaved]         = useState<string | null>(null);
@@ -466,6 +466,7 @@ export default function ClientRosterPage() {
       statusNote: c.statusNote ?? '',
       phone: c.phone ?? '',
       monthlyAmount: c.monthlyAmount != null ? String(c.monthlyAmount) : '',
+      billingInterval: c.billingIntervalMonths ?? 1,
     };
 
   const toggleNotes = (id: string) => setOpenNotes(openNotes === id ? null : id);
@@ -477,10 +478,11 @@ export default function ClientRosterPage() {
     const statusReason = d.status === 'Active' ? null : (d.statusReason || null);
     const statusNote   = d.status === 'Active' ? null : (d.statusNote.trim() || null);
     const phone = d.phone.trim() || null;
-    // Only a positive number is a valid rate; anything else stores null (falls
+    // Only a positive number is a valid amount; anything else stores null (falls
     // back to the ledger) rather than corrupting MRR with a negative/zero.
     const mAmt = Number(d.monthlyAmount);
     const monthlyAmount = d.monthlyAmount.trim() && !isNaN(mAmt) && mAmt > 0 ? mAmt : null;
+    const billingInterval = [1, 3, 6, 12].includes(d.billingInterval) ? d.billingInterval : 1;
     const res = await fetch('/api/clients', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -489,6 +491,7 @@ export default function ClientRosterPage() {
         notes: d.notes,
         next_payment_date: d.paymentDate || null,
         monthly_amount: monthlyAmount,
+        billing_interval_months: billingInterval,
         goal: goal || null,
         program_start: d.programStart || null,
         status: d.status,
@@ -512,6 +515,7 @@ export default function ClientRosterPage() {
               statusNote: statusNote ?? undefined,
               phone: phone ?? undefined,
               monthlyAmount: monthlyAmount ?? undefined,
+              billingIntervalMonths: billingInterval,
             }
           : x
       ));
@@ -528,15 +532,20 @@ export default function ClientRosterPage() {
   const markPaid = async (c: Client) => {
     const draftAmt = getDraft(c).monthlyAmount.trim();
     const savedAmt = c.monthlyAmount != null ? String(c.monthlyAmount) : '';
-    if (draftAmt !== savedAmt) {
-      window.alert('You’ve changed the monthly amount but not saved it. Click "Save changes" first, then log the payment.');
+    // Force a Save if EITHER the amount or the billing frequency differs from
+    // what's saved — otherwise the button (draft-based) and the actual log/roll
+    // (saved-based) could disagree.
+    if (draftAmt !== savedAmt || getDraft(c).billingInterval !== (c.billingIntervalMonths ?? 1)) {
+      window.alert('You’ve changed the payment amount or frequency but not saved it. Click "Save changes" first, then log the payment.');
       return;
     }
     if (!c.monthlyAmount || c.monthlyAmount <= 0) {
-      window.alert('Set a monthly amount for this client first (then Save), so we know how much to log.');
+      window.alert('Set a payment amount for this client first (then Save), so we know how much to log.');
       return;
     }
-    if (!window.confirm(`Log a £${c.monthlyAmount} payment from ${c.name} and move their next payment due date forward one month?`)) return;
+    const interval = c.billingIntervalMonths ?? 1;
+    const rollLabel = interval === 1 ? 'one month' : `${interval} months`;
+    if (!window.confirm(`Log a £${c.monthlyAmount} payment from ${c.name} and move their next payment due date forward ${rollLabel}?`)) return;
     setPayingId(c.id);
     const res = await fetch('/api/clients/mark-paid', {
       method: 'POST',
@@ -1091,10 +1100,10 @@ export default function ClientRosterPage() {
                         Payments
                       </h3>
                       <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
-                        Monthly rate feeds MRR. The due date sets the Paid/Due/Overdue status.
+                        What they pay each time + how often. The due date sets the Paid/Due/Overdue status.
                       </p>
 
-                      <label className="block text-[10px] font-semibold uppercase tracking-[0.4px] mb-1" style={{ color: 'var(--text3)' }}>Monthly amount (£)</label>
+                      <label className="block text-[10px] font-semibold uppercase tracking-[0.4px] mb-1" style={{ color: 'var(--text3)' }}>Amount per payment (£)</label>
                       <input
                         type="number"
                         inputMode="decimal"
@@ -1106,6 +1115,31 @@ export default function ClientRosterPage() {
                         onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
                         onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
                       />
+
+                      <label className="block text-[10px] font-semibold uppercase tracking-[0.4px] mb-1" style={{ color: 'var(--text3)' }}>Billing frequency</label>
+                      <select
+                        value={getDraft(c).billingInterval}
+                        onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), billingInterval: Number(e.target.value) } }))}
+                        className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150 mb-1"
+                        style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                      >
+                        <option value={1}>Monthly</option>
+                        <option value={3}>Every 3 months</option>
+                        <option value={6}>Every 6 months</option>
+                        <option value={12}>Every 12 months</option>
+                      </select>
+                      {(() => {
+                        const amt = Number(getDraft(c).monthlyAmount);
+                        const iv = getDraft(c).billingInterval || 1;
+                        if (!getDraft(c).monthlyAmount.trim() || isNaN(amt) || amt <= 0) return null;
+                        return (
+                          <p className="text-[11px] mb-3" style={{ color: 'var(--text3)' }}>
+                            {iv === 1
+                              ? <>Counts <strong style={{ color: 'var(--accent-text)' }}>£{amt.toLocaleString()}/mo</strong> toward MRR.</>
+                              : <>£{amt.toLocaleString()} every {iv} months = <strong style={{ color: 'var(--accent-text)' }}>£{(Math.round((amt / iv) * 100) / 100).toLocaleString()}/mo</strong> toward MRR.</>}
+                          </p>
+                        );
+                      })()}
 
                       <label className="block text-[10px] font-semibold uppercase tracking-[0.4px] mb-1" style={{ color: 'var(--text3)' }}>Next payment due</label>
                       <input
@@ -1132,7 +1166,9 @@ export default function ClientRosterPage() {
                         onMouseEnter={(e) => { if (payingId !== c.id) (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-mid)'; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-dim)'; }}
                       >
-                        {payingId === c.id ? 'Logging…' : '✓ Payment received — log & roll a month'}
+                        {payingId === c.id
+                          ? 'Logging…'
+                          : `✓ Payment received — log & roll ${(c.billingIntervalMonths ?? 1) === 1 ? 'a month' : `${c.billingIntervalMonths} months`}`}
                       </button>
                     </div>
 

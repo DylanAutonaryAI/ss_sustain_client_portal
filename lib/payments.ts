@@ -26,10 +26,11 @@ export function usePayments() {
   return { payments, loading, refetch };
 }
 
-// MRR = sum of each ACTIVE client's agreed monthly rate. Prefer the explicit
-// monthlyAmount (set at import, in the roster, or by the Stripe webhook); fall
-// back to their most recent Paid amount when no rate is set, so nothing
-// regresses for clients tracked only via the payment ledger. Single source of
+// MRR = sum of each ACTIVE client's monthly-normalised rate. monthlyAmount holds
+// the amount PER PAYMENT (installment); dividing by billingIntervalMonths gives
+// the monthly figure — so a £555 payment every 3 months counts as £185/month.
+// Falls back to the most recent Paid ledger amount (assumed monthly) when no
+// rate is set, so nothing regresses for ledger-only clients. Single source of
 // truth so the overview / revenue / forecast pages never disagree.
 export function computeMrr(payments: Payment[], clients: Client[]): number {
   const latestPaid: Record<string, { date: string; amount: number }> = {};
@@ -45,7 +46,10 @@ export function computeMrr(payments: Payment[], clients: Client[]): number {
   return clients
     .filter(c => c.status === 'Active' && !c.pending)
     .reduce((s, c) => {
-      const rate = c.monthlyAmount != null && c.monthlyAmount > 0 ? c.monthlyAmount : (latestPaid[c.id]?.amount ?? 0);
-      return s + rate;
+      const interval = c.billingIntervalMonths && c.billingIntervalMonths > 0 ? c.billingIntervalMonths : 1;
+      // Prefer the set installment; else fall back to the most recent Paid amount.
+      // Both are per-payment figures, so both normalise by the billing interval.
+      const perPayment = c.monthlyAmount != null && c.monthlyAmount > 0 ? c.monthlyAmount : (latestPaid[c.id]?.amount ?? 0);
+      return s + perPayment / interval;
     }, 0);
 }

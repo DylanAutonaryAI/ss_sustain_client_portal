@@ -66,11 +66,16 @@ export async function PATCH(request: NextRequest) {
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
-  // Guard the monthly rate: only a positive number is valid; coerce anything
+  // Guard the payment amount: only a positive number is valid; coerce anything
   // else to null so a bad value can't drag MRR negative or zero out a payer.
   if ('monthly_amount' in updates) {
     const n = Number(updates.monthly_amount);
     updates.monthly_amount = updates.monthly_amount != null && !isNaN(n) && n > 0 ? n : null;
+  }
+  // Billing interval must be one of the supported cadences; default to monthly.
+  if ('billing_interval_months' in updates) {
+    const n = Number(updates.billing_interval_months);
+    updates.billing_interval_months = [1, 3, 6, 12].includes(n) ? n : 1;
   }
 
   const { data, error } = await supabase
