@@ -26,8 +26,11 @@ export function usePayments() {
   return { payments, loading, refetch };
 }
 
-// MRR = sum of each ACTIVE client's most recent paid amount (their current rate).
-// Single source of truth so the overview + revenue page never disagree.
+// MRR = sum of each ACTIVE client's agreed monthly rate. Prefer the explicit
+// monthlyAmount (set at import, in the roster, or by the Stripe webhook); fall
+// back to their most recent Paid amount when no rate is set, so nothing
+// regresses for clients tracked only via the payment ledger. Single source of
+// truth so the overview / revenue / forecast pages never disagree.
 export function computeMrr(payments: Payment[], clients: Client[]): number {
   const latestPaid: Record<string, { date: string; amount: number }> = {};
   for (const p of payments) {
@@ -35,7 +38,14 @@ export function computeMrr(payments: Payment[], clients: Client[]): number {
     const cur = latestPaid[p.client_id];
     if (!cur || p.paid_at > cur.date) latestPaid[p.client_id] = { date: p.paid_at, amount: p.amount };
   }
+  // Pending clients (imported / Stripe-paid but not yet invited) are excluded —
+  // same "active relationship" definition the roster uses (status Active AND not
+  // pending). A negative/zero rate can't drag MRR down: it's ignored in favour
+  // of the ledger fallback.
   return clients
-    .filter(c => c.status === 'Active')
-    .reduce((s, c) => s + (latestPaid[c.id]?.amount ?? 0), 0);
+    .filter(c => c.status === 'Active' && !c.pending)
+    .reduce((s, c) => {
+      const rate = c.monthlyAmount != null && c.monthlyAmount > 0 ? c.monthlyAmount : (latestPaid[c.id]?.amount ?? 0);
+      return s + rate;
+    }, 0);
 }

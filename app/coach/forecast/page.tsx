@@ -11,7 +11,7 @@ export default function ForecastPage() {
   const { payments } = usePayments();
 
   const mrr             = computeMrr(payments, clients);
-  const activeCount     = clients.filter(c => c.status === 'Active').length;
+  const activeCount     = clients.filter(c => c.status === 'Active' && !c.pending).length;
   const avgPerClient    = activeCount > 0 ? mrr / activeCount : 0;
   const projectedAnnual = mrr * 12;
 

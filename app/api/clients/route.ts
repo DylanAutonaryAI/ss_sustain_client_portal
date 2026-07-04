@@ -66,6 +66,13 @@ export async function PATCH(request: NextRequest) {
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
+  // Guard the monthly rate: only a positive number is valid; coerce anything
+  // else to null so a bad value can't drag MRR negative or zero out a payer.
+  if ('monthly_amount' in updates) {
+    const n = Number(updates.monthly_amount);
+    updates.monthly_amount = updates.monthly_amount != null && !isNaN(n) && n > 0 ? n : null;
+  }
+
   const { data, error } = await supabase
     .from('clients')
     .update(updates)

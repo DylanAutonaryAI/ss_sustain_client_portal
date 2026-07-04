@@ -15,6 +15,7 @@ export interface ClientRow {
   status_reason: string | null;
   status_note: string | null;
   next_payment_date: string | null;
+  monthly_amount: number | null;
   program_start: string | null;
   notes: string | null;
   since: string | null;
@@ -122,6 +123,7 @@ export function mapRow(row: ClientRow): Client {
     referrals: 0,
     notes: row.notes || '',
     nextPaymentDate: row.next_payment_date ?? undefined,
+    monthlyAmount: row.monthly_amount != null ? Number(row.monthly_amount) : undefined,
     programStart: row.program_start ?? undefined,
     statusReason: row.status_reason ?? undefined,
     statusNote: row.status_note ?? undefined,

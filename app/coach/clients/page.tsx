@@ -410,7 +410,8 @@ export default function ClientRosterPage() {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState('');
   const [openNotes, setOpenNotes] = useState<string | null>(null);
-  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string; phone: string }>>({});
+  const [drafts, setDrafts]       = useState<Record<string, { notes: string; paymentDate: string; goal: string; programStart: string; status: ClientStatus; statusReason: string; statusNote: string; phone: string; monthlyAmount: string }>>({});
+  const [payingId, setPayingId]   = useState<string | null>(null);
   const [customPhase, setCustomPhase] = useState<Record<string, boolean>>({});
   const [saved, setSaved]         = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
@@ -464,6 +465,7 @@ export default function ClientRosterPage() {
       statusReason: c.statusReason ?? '',
       statusNote: c.statusNote ?? '',
       phone: c.phone ?? '',
+      monthlyAmount: c.monthlyAmount != null ? String(c.monthlyAmount) : '',
     };
 
   const toggleNotes = (id: string) => setOpenNotes(openNotes === id ? null : id);
@@ -475,6 +477,10 @@ export default function ClientRosterPage() {
     const statusReason = d.status === 'Active' ? null : (d.statusReason || null);
     const statusNote   = d.status === 'Active' ? null : (d.statusNote.trim() || null);
     const phone = d.phone.trim() || null;
+    // Only a positive number is a valid rate; anything else stores null (falls
+    // back to the ledger) rather than corrupting MRR with a negative/zero.
+    const mAmt = Number(d.monthlyAmount);
+    const monthlyAmount = d.monthlyAmount.trim() && !isNaN(mAmt) && mAmt > 0 ? mAmt : null;
     const res = await fetch('/api/clients', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -482,6 +488,7 @@ export default function ClientRosterPage() {
         id: c.id,
         notes: d.notes,
         next_payment_date: d.paymentDate || null,
+        monthly_amount: monthlyAmount,
         goal: goal || null,
         program_start: d.programStart || null,
         status: d.status,
@@ -504,12 +511,48 @@ export default function ClientRosterPage() {
               statusReason: statusReason ?? undefined,
               statusNote: statusNote ?? undefined,
               phone: phone ?? undefined,
+              monthlyAmount: monthlyAmount ?? undefined,
             }
           : x
       ));
       setSaved(c.id);
       setTimeout(() => setSaved(null), 2000);
     }
+  };
+
+  // One-click "Payment received": logs a Paid payment of the client's SAVED
+  // monthly rate and rolls their next-due date forward a month (server-side).
+  // We deliberately log from the saved rate (server-side), never the unsaved
+  // draft — otherwise the ledger amount and MRR (which reads the saved rate)
+  // could silently diverge. If the draft rate differs, make Sam Save first.
+  const markPaid = async (c: Client) => {
+    const draftAmt = getDraft(c).monthlyAmount.trim();
+    const savedAmt = c.monthlyAmount != null ? String(c.monthlyAmount) : '';
+    if (draftAmt !== savedAmt) {
+      window.alert('You’ve changed the monthly amount but not saved it. Click "Save changes" first, then log the payment.');
+      return;
+    }
+    if (!c.monthlyAmount || c.monthlyAmount <= 0) {
+      window.alert('Set a monthly amount for this client first (then Save), so we know how much to log.');
+      return;
+    }
+    if (!window.confirm(`Log a £${c.monthlyAmount} payment from ${c.name} and move their next payment due date forward one month?`)) return;
+    setPayingId(c.id);
+    const res = await fetch('/api/clients/mark-paid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: c.id }), // server uses the saved monthly_amount
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.nextPaymentDate) {
+      setRoster(prev => prev.map(x =>
+        x.id === c.id ? { ...x, nextPaymentDate: data.nextPaymentDate, payment: calcPaymentStatus(data.nextPaymentDate) } : x,
+      ));
+      setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), paymentDate: data.nextPaymentDate } }));
+    } else {
+      window.alert(data.error || 'Could not log the payment.');
+    }
+    setPayingId(null);
   };
 
   const grantAccess = async (c: Client) => {
@@ -1042,14 +1085,29 @@ export default function ClientRosterPage() {
                       />
                     </div>
 
-                    {/* Payment date */}
+                    {/* Payments — monthly rate, next-due date, and one-click "received" */}
                     <div>
                       <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>
-                        Next payment due
+                        Payments
                       </h3>
                       <p className="text-[12px] mb-3" style={{ color: 'var(--text3)' }}>
-                        Sets the payment status automatically — Paid, Due, or Overdue.
+                        Monthly rate feeds MRR. The due date sets the Paid/Due/Overdue status.
                       </p>
+
+                      <label className="block text-[10px] font-semibold uppercase tracking-[0.4px] mb-1" style={{ color: 'var(--text3)' }}>Monthly amount (£)</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={getDraft(c).monthlyAmount}
+                        onChange={(e) => setDrafts(d => ({ ...d, [c.id]: { ...getDraft(c), monthlyAmount: e.target.value } }))}
+                        placeholder="e.g. 185"
+                        className="w-full px-3 py-2.5 rounded-[8px] text-[13px] outline-none transition-colors duration-150 mb-3"
+                        style={{ background: 'var(--bg2)', border: '1px solid var(--border2)', color: 'var(--text)' }}
+                        onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+                        onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
+                      />
+
+                      <label className="block text-[10px] font-semibold uppercase tracking-[0.4px] mb-1" style={{ color: 'var(--text3)' }}>Next payment due</label>
                       <input
                         type="date"
                         value={getDraft(c).paymentDate}
@@ -1060,10 +1118,22 @@ export default function ClientRosterPage() {
                         onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'var(--border2)'; }}
                       />
                       {getDraft(c).paymentDate && (
-                        <p className="text-[11px]" style={{ color: `var(--${calcPaymentStatus(getDraft(c).paymentDate) === 'Paid' ? 'accent-text' : calcPaymentStatus(getDraft(c).paymentDate) === 'Due' ? 'amber' : 'red'})` }}>
+                        <p className="text-[11px] mb-3" style={{ color: `var(--${calcPaymentStatus(getDraft(c).paymentDate) === 'Paid' ? 'accent-text' : calcPaymentStatus(getDraft(c).paymentDate) === 'Due' ? 'amber' : 'red'})` }}>
                           Status will show: {calcPaymentStatus(getDraft(c).paymentDate)}
                         </p>
                       )}
+
+                      {/* One-click: logs the payment + rolls the due date forward a month */}
+                      <button
+                        onClick={() => markPaid(c)}
+                        disabled={payingId === c.id}
+                        className="w-full px-3 py-2.5 rounded-[8px] text-[12px] font-semibold transition-all duration-150 disabled:opacity-60"
+                        style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)', color: 'var(--accent-text)', cursor: payingId === c.id ? 'default' : 'pointer' }}
+                        onMouseEnter={(e) => { if (payingId !== c.id) (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-mid)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--accent-dim)'; }}
+                      >
+                        {payingId === c.id ? 'Logging…' : '✓ Payment received — log & roll a month'}
+                      </button>
                     </div>
 
                     {/* Actions spanning full width */}

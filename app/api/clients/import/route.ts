@@ -13,10 +13,11 @@ import { generateReferralCode } from '@/lib/referral';
 // Body: { clients: [{ full_name, email, phone?, goal? }, ...] }
 // Returns per-row results so the UI can show what was added / skipped / failed.
 
-interface ImportRow { full_name?: unknown; email?: unknown; phone?: unknown; goal?: unknown }
+interface ImportRow { full_name?: unknown; email?: unknown; phone?: unknown; goal?: unknown; amount?: unknown; next_due?: unknown }
 type Outcome = { email: string; name: string; status: 'added' | 'duplicate' | 'invalid'; reason?: string };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -57,6 +58,11 @@ export async function POST(request: NextRequest) {
     const emailLc = email.toLowerCase();
     const phone = typeof raw.phone === 'string' && raw.phone.trim() ? raw.phone.trim() : null;
     const goal = typeof raw.goal === 'string' && raw.goal.trim() ? raw.goal.trim() : null;
+    // Optional monthly rate + next-due date. Amount tolerates a leading £ / commas.
+    const amtRaw = typeof raw.amount === 'string' ? raw.amount.replace(/[£,\s]/g, '') : raw.amount;
+    const amtNum = Number(amtRaw);
+    const monthlyAmount = amtRaw !== '' && amtRaw != null && !isNaN(amtNum) && amtNum > 0 ? amtNum : null;
+    const nextDue = typeof raw.next_due === 'string' && DATE_RE.test(raw.next_due.trim()) ? raw.next_due.trim() : null;
 
     if (!name || !email || !EMAIL_RE.test(email)) {
       outcomes.push({ email, name, status: 'invalid', reason: !name ? 'missing name' : 'invalid email' });
@@ -80,6 +86,8 @@ export async function POST(request: NextRequest) {
       referral_code: generateReferralCode(name),
       access_granted_at: null,                                  // pending — no invite yet
       onboarding_completed_at: skipOnboarding ? nowIso : null,  // skip vs route through onboarding
+      monthly_amount: monthlyAmount,                            // agreed rate → MRR (optional)
+      next_payment_date: nextDue,                               // drives the payment pill (optional)
     });
   }
 

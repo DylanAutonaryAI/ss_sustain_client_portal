@@ -166,10 +166,46 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   const nextPaymentDate = periodEndIsoDate(sub);
 
+  // Monthly rate (GBP) from the subscription's price, so MRR counts Stripe
+  // clients the same way as manually-tracked ones. Only trust it for a monthly
+  // GBP price — an annual/weekly price or a non-GBP currency would be mis-scaled,
+  // so leave it null and fall back to the payment ledger instead.
+  const price = sub.items?.data?.[0]?.price;
+  const isMonthlyGbp =
+    price?.currency === 'gbp' &&
+    price?.recurring?.interval === 'month' &&
+    (price?.recurring?.interval_count ?? 1) === 1;
+  const monthlyAmount = isMonthlyGbp && price?.unit_amount != null ? price.unit_amount / 100 : null;
+
   // Stripe Payment Links collect phone only when the merchant enables it; when
   // present it's an E.164 string. Defensively read it either way — surfaces in
   // the roster's About block with a wa.me link if set, blank if not.
   const phone = session.customer_details?.phone ?? null;
+
+  // If this person already exists on the roster as a manual/imported row (same
+  // email, no Stripe link yet), LINK Stripe to that row instead of inserting a
+  // duplicate — otherwise MRR would count the same human twice.
+  const { data: manualRow } = await admin
+    .from('clients')
+    .select('id')
+    .eq('coach_id', coachId)
+    .ilike('email', email)
+    .is('stripe_subscription_id', null)
+    .maybeSingle();
+  if (manualRow) {
+    const { error: linkErr } = await admin
+      .from('clients')
+      .update({
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId,
+        next_payment_date: nextPaymentDate,
+        monthly_amount: monthlyAmount,
+        status: 'Active',
+      })
+      .eq('id', manualRow.id);
+    if (linkErr) throw new Error(`Failed to link Stripe to existing client: ${linkErr.message}`);
+    return;
+  }
 
   const { error } = await admin.from('clients').insert({
     user_id: null, // pending — no auth user yet
@@ -180,6 +216,7 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     goal: null,
     status: 'Active',
     next_payment_date: nextPaymentDate,
+    monthly_amount: monthlyAmount,
     notes: null,
     since: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     referral_code: generateReferralCode(fullName),

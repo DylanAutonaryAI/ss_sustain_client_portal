@@ -15,12 +15,15 @@ export default function CoachOverviewPage() {
   const { payments } = usePayments();
   const mrr = computeMrr(payments, clients);
   const recent = clients.slice(0, 4);
+  // Pending clients (imported / Stripe-paid, not yet invited) are excluded from
+  // churn + payments-due + the active count — they can't log in or be chased yet,
+  // and their imported due-dates shouldn't flag them as at-risk before go-live.
   const churnRisk = clients
-    .filter(c => c.healthScore < 40 || c.payment === 'Overdue')
+    .filter(c => !c.pending && (c.healthScore < 40 || c.payment === 'Overdue'))
     .slice(0, 4);
 
-  const activeCount  = clients.filter(c => c.status === 'Active').length;
-  const paymentsDue  = clients.filter(c => c.payment === 'Due' || c.payment === 'Overdue').length;
+  const activeCount  = clients.filter(c => c.status === 'Active' && !c.pending).length;
+  const paymentsDue  = clients.filter(c => !c.pending && (c.payment === 'Due' || c.payment === 'Overdue')).length;
   const avgMonths    = clients.length
     ? clients.reduce((sum, c) => { const m = parseInt(c.duration); return sum + (isNaN(m) ? 0 : m); }, 0) / clients.length
     : 0;

@@ -68,6 +68,7 @@ export interface Client {
   referrals: number;
   notes: string;
   nextPaymentDate?: string; // YYYY-MM-DD — drives auto Paid/Due/Overdue
+  monthlyAmount?: number;   // agreed monthly rate (GBP); drives MRR + "Payment received" quick-log
   programStart?: string; // YYYY-MM-DD — start of current phase; drives the portal week count
   statusReason?: string; // preset reason a client was paused/cancelled
   statusNote?: string;   // optional free-text note expanding on statusReason
