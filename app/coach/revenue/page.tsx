@@ -5,6 +5,7 @@ import Topbar from '@/components/layout/Topbar';
 import StatCard from '@/components/ui/StatCard';
 import AnimatedStat from '@/components/ui/CountUp';
 import Donut from '@/components/ui/Donut';
+import { PayTag } from '@/components/ui/Pill';
 import { useClientRoster } from '@/lib/clients';
 import { usePayments, computeMrr, formatGBP as GBP } from '@/lib/payments';
 import type { PaymentStatus } from '@/lib/types';
@@ -23,6 +24,25 @@ export default function RevenuePage() {
   const [status, setStatus]     = useState<PaymentStatus>('Paid');
   const [added, setAdded]       = useState(false);
   const [saving, setSaving]     = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(id: string, label: string) {
+    if (!window.confirm(`Delete this payment (${label})?\n\nThis removes it from your ledger and totals. This cannot be undone.`)) return;
+    setDeleting(id);
+    const res = await fetch(`/api/payments?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      window.alert(d.error || 'Could not delete payment.');
+    }
+    await refetch();
+    setDeleting(null);
+  }
+
+  const fmtDate = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
 
   useEffect(() => {
     if (!clientId && clients.length > 0) setClientId(clients[0].id);
@@ -189,6 +209,64 @@ export default function RevenuePage() {
               {added ? 'Added ✓' : saving ? 'Adding…' : 'Add'}
             </button>
           </div>
+        </div>
+
+        {/* All payments — itemized + deletable */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>All payments</span>
+          <span className="text-[11px]" style={{ color: 'var(--text3)' }}>{payments.length} logged</span>
+        </div>
+        <div
+          className="rounded-xl overflow-hidden mb-6"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
+        >
+         <div className="overflow-x-auto">
+          <div style={{ minWidth: 520 }}>
+          <div
+            className="grid px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[1px]"
+            style={{ gridTemplateColumns: '1.6fr 1.2fr 1fr 0.9fr 40px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', color: 'var(--text3)' }}
+          >
+            <div>Client</div><div>Date</div><div>Amount</div><div>Status</div><div />
+          </div>
+          {payments.map((p, i) => (
+            <div
+              key={p.id}
+              className="grid items-center px-5 py-3 text-[13px] transition-colors duration-100"
+              style={{
+                gridTemplateColumns: '1.6fr 1.2fr 1fr 0.9fr 40px',
+                borderBottom: i < payments.length - 1 ? '1px solid var(--border)' : 'none',
+                color: 'var(--text2)',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg2)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = ''; }}
+            >
+              <div style={{ color: 'var(--text)' }} className="truncate">{p.client_name}</div>
+              <div>{fmtDate(p.paid_at)}</div>
+              <div style={{ color: 'var(--text)', fontWeight: 500 }}>{GBP(p.amount)}</div>
+              <div><PayTag status={p.status} /></div>
+              <button
+                onClick={() => handleDelete(p.id, `${p.client_name} · ${GBP(p.amount)}`)}
+                disabled={deleting === p.id}
+                title="Delete payment"
+                className="w-7 h-7 rounded-[7px] flex items-center justify-center text-[15px] transition-colors duration-150 disabled:opacity-50 justify-self-end"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: deleting === p.id ? 'default' : 'pointer' }}
+                onMouseEnter={(e) => { if (deleting !== p.id) { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(240,79,79,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)'; } }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; }}
+              >
+                {deleting === p.id ? '…' : '✕'}
+              </button>
+            </div>
+          ))}
+          {loading && (
+            <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--text3)' }}>Loading payments…</div>
+          )}
+          {!loading && payments.length === 0 && (
+            <div className="px-5 py-8 text-center text-[13px]" style={{ color: 'var(--text3)' }}>
+              No payments logged yet. Add your first one above.
+            </div>
+          )}
+          </div>
+         </div>
         </div>
 
         {/* Monthly breakdown */}
