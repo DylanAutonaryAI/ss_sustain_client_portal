@@ -140,8 +140,16 @@ export default function SettingsPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setEmailMsg({ msg: 'Email updated ✓ — use it next time you sign in.', error: false });
-      await refreshProfile();
+      if (data.pending) {
+        // Ownership verification: change lands only after the new inbox confirms.
+        setEmailMsg({
+          msg: `Confirmation sent to ${email.trim()}. Open that inbox and click the link — your login email changes only after you confirm.`,
+          error: false,
+        });
+      } else {
+        setEmailMsg({ msg: 'Email updated ✓ — use it next time you sign in.', error: false });
+        await refreshProfile();
+      }
     } else {
       setEmailMsg({ msg: data.error || 'Could not update email.', error: true });
     }
@@ -256,13 +264,13 @@ export default function SettingsPage() {
             </Card>
 
             {/* Email */}
-            <Card title="Email address" desc="The email you use to sign in.">
+            <Card title="Email address" desc="The email you use to sign in. Changing it sends a confirmation link to the new address — it only takes effect once you click that link.">
               <div>
                 <label style={labelStyle}>Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} autoComplete="email" />
                 <div className="mt-4">
                   <button onClick={saveEmail} disabled={emailBusy} style={{ ...btnPrimary, opacity: emailBusy ? 0.6 : 1 }}>
-                    {emailBusy ? 'Updating…' : 'Update email'}
+                    {emailBusy ? 'Sending…' : 'Update email'}
                   </button>
                   <Status msg={emailMsg.msg} error={emailMsg.error} />
                 </div>

@@ -32,9 +32,16 @@ done; the short version:
    **without sending emails**. Commits `ba1056a`, `ef70aec`, `cdd3497`, `52d50a6`.
 
 **Deferred on purpose — do NOT apply without a decision** (each documented in Recently
-done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach), the
-Next 16 upgrade (breaking; mitigated by Vercel), and two minor auth lows needing bigger
-flows. **`ONBOARDING_TEST_MODE` is deliberately still ON — not going live yet.**
+done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach) and the
+**Next major upgrade** (breaking; mitigated by Vercel — **DECISION 2026-07-05: stay on
+Next 14 for now**, go 14→15 first when picked up). **`ONBOARDING_TEST_MODE` is deliberately
+still ON — not going live yet.**
+
+**The two minor auth lows are now BUILT (2026-07-05)** — invite-token single-use +
+email ownership-verify. See Recently done. One carry-forward: **run
+`db/2026-07-05_invite_single_use.sql`** (adds `clients.invite_accepted_at`; the code
+fails safe until it's applied) and **confirm Supabase → Auth has email confirmations ON**
+so the email change actually verifies (see Watch out).
 
 ---
 
@@ -73,10 +80,41 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — nothing in progress (security pass shipped 2026-07-05)
-The 2026-07-04→05 work is **done and pushed**; nothing is mid-flight. What remains before
-real clients go live is **operational only** — see the carry-forward at the top and Still
-to do. `ONBOARDING_TEST_MODE` is deliberately still **ON**.
+## 🟢 Active — nothing in progress
+The 2026-07-04→05 security pass is **done and pushed**. The two deferred auth lows
+(invite single-use + email ownership-verify) were **built 2026-07-05** (see Recently done)
+— **committed locally, NOT yet pushed**, pending: (1) run
+`db/2026-07-05_invite_single_use.sql`, (2) confirm the Supabase email-confirmation setting.
+`ONBOARDING_TEST_MODE` is deliberately still **ON**.
+
+---
+
+## 🟢 Recently done — auth-hardening lows (2026-07-05)
+
+### Invite-token single-use + email ownership-verify — BUILT (typecheck + prod build clean)
+The last two deferred security lows, both non-breaking and fail-safe:
+- **Invite single-use.** `db/2026-07-05_invite_single_use.sql` adds
+  `clients.invite_accepted_at`. `app/api/set-password/route.ts` now looks up the client
+  row after validating the invite token: if `invite_accepted_at` is already set it returns
+  **409** ("already used — sign in"), otherwise it sets the password and **stamps the
+  column** so the ~1h-valid invite access_token can't be replayed to re-run the flow.
+  **Fails safe:** the lookup is wrapped so a missing column / DB blip just no-ops the
+  enforcement (uses `.limit(1)`, not maybeSingle, so a stray duplicate row can't throw) —
+  set-password keeps working, the feature simply activates once the migration is applied.
+- **Email ownership-verify.** `app/api/profile/email/route.ts` no longer does the instant
+  admin change (`email_confirm:true`). It now calls **server-side** `supabase.auth.updateUser({ email })`
+  (server client, NOT the browser one — that hangs post-key-migration), which emails a
+  confirmation link to the **new** address via the verified Supabase→Resend SMTP; the login
+  email changes **only when that link is clicked**. `app/api/me/route.ts` gained a
+  **self-healing sync**: once auth confirms the new email, it reconciles `profiles`/`clients`
+  to match (awaited, rare path, never fatal). Kept the throttle + generic errors (no
+  membership oracle). **Degrades safely:** if the project has email confirmations OFF,
+  updateUser applies immediately and the route syncs profiles/clients right there — no
+  regression. Settings UI now says "Confirmation sent — check your new inbox."
+- **Verified here:** `tsc --noEmit` clean, `next build` clean, and the guard/validation
+  branches driven against a live dev server (email route 401 unauth; set-password 400
+  missing-fields / 400 pw<8 / 401 bad-token). Full replay-block + email-delivery behaviour
+  needs a live session + real mailbox — an operational smoke test (see carry-forward).
 
 ---
 
@@ -118,10 +156,17 @@ nits found and fixed).
     read policies per-coach. **Latent today** (one coach ⇒ current behaviour is intended);
     it rewrites load-bearing read policies, so **apply + test on a preview BEFORE adding a
     2nd coach.**
-  - **Next.js CVEs** — only fixable by a **Next 16 major upgrade (breaking)**; mitigated by
-    Vercel's platform. Needs its own tested effort.
-  - Two minor lows needing bigger flows: invite-token single-use, email ownership-verify
-    (needs working SMTP templates).
+  - **Next.js CVEs** — only fixable by a **Next major upgrade (breaking)**; mitigated by
+    Vercel's platform. **DECISION (2026-07-05): stay on Next 14 (`14.2.35`, latest 14.2.x)
+    for now.** Rationale: CVEs are already mitigated at the Vercel layer, 14.2.35 carries
+    every backported 14-line fix, and a breaking framework jump has no business landing in
+    the go-live window (Stripe → live + real clients off Notion) given how fragile auth is
+    here. **When picked up later, go 14 → 15 first** (small jump, App Router stable across
+    it, back inside Vercel's support window) rather than straight to 16. Watch for the day a
+    new CVE is 15/16-only AND Vercel's auto-mitigation doesn't cover it — that's when 14
+    stops being free. Needs its own tested effort on a Vercel preview.
+  - ~~Two minor lows needing bigger flows: invite-token single-use, email ownership-verify.~~
+    **BOTH BUILT 2026-07-05 — see the dedicated entry below.**
 
 ### Per-client billing frequency + robust import — `ba1056a`, `ef70aec`, `cdd3497`, `52d50a6`
 - **`monthly_amount` redefined as *amount per payment* (installment).** MRR is now
@@ -648,6 +693,11 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `security_hardening`, `rate_limits`, `fix_clients_policy` (all applied + verified by
   direct query). **⚠️ `client_phone` (added 2026-06-04) — confirm it's run** (needed for
   the roster phone/WhatsApp field + Stripe `customer_details.phone`).
+  **⚠️ `db/2026-07-05_invite_single_use.sql` — NOT yet applied** (this machine's
+  `.env.local` has no `SUPABASE_DB_URL`, so the runner couldn't run it). Additive + safe
+  (`add column if not exists clients.invite_accepted_at`); the invite single-use code fails
+  safe until it's applied. Run it in the Supabase SQL editor (or add `SUPABASE_DB_URL` and
+  `node scripts/run-migration.mjs db/2026-07-05_invite_single_use.sql`).
   **⛔ `db/DEFERRED_multi_coach_rls.sql` is intentionally NOT applied** — do not run it
   until a 2nd coach is being added, and test on a preview first (see the security entry in
   Recently done). If Vercel ever points at a *different* Supabase than local `.env.local`,
@@ -661,10 +711,29 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 - **Refresh-token health (open):** verify `POST /auth/v1/token?grant_type=refresh_token`
   returns 2xx after a clean re-login under the new keys. If it 4xx's, browser sessions can't
   auto-extend past ~1h — see Still to do.
+- **Email ownership-verify depends on a Supabase setting (2026-07-05).** The new email-change
+  flow (`/api/profile/email` → server `auth.updateUser({ email })`) only actually *verifies*
+  ownership if **Supabase → Authentication → sign-in/providers → Email has confirmations
+  enabled** (and, ideally, "Secure email change" ON for double-confirm). SMTP is already
+  verified (Resend), so the confirmation email WILL deliver. If confirmations are OFF, the
+  change applies instantly (route detects this and syncs profiles/clients on the spot) —
+  functional, just not verifying. **Confirm this toggle before relying on the verification.**
+  The confirmation link redirects to `…/portal/settings`; the actual switch happens at
+  Supabase's verify endpoint, and `/api/me` reconciles `profiles`/`clients` on the next load.
 
 ---
 
-**Last updated:** 2026-07-05 — **Security audit + remediation shipped** (`fca29cc`, `f5c6603`): critical client→coach self-promotion fixed + verified on the live DB, all 4 mediums + most lows fixed, adversarially re-verified as non-breaking; deferred items (multi-coach RLS, Next 16 upgrade, 2 minor auth lows) documented, not applied; `ONBOARDING_TEST_MODE` deliberately left ON. Plus **per-client billing frequency** (amount-per-payment + 1/3/6/12-month interval, MRR divides by interval) and a **header-aware / value-based roster importer** (creates pending clients, sends no emails) for Sam's 27-client sheet. Full detail in Recently done.
+**Last updated:** 2026-07-05 (later) — **Built the last two deferred auth lows:**
+invite-token **single-use** (`clients.invite_accepted_at` + 409 replay-block in
+`/api/set-password`; migration `db/2026-07-05_invite_single_use.sql` **still to run**) and
+**email ownership-verify** (`/api/profile/email` now sends a Supabase confirmation link to
+the new address instead of switching instantly; `/api/me` self-heals the profile/roster
+email post-confirm). Typecheck + prod build clean; guard/validation paths driven live.
+**Committed locally, not pushed** — pending the migration + a Supabase email-confirmation
+setting check (see Watch out). Also recorded the **stay-on-Next-14** decision. Prior
+entry below.
+
+**Earlier 2026-07-05 — Security audit + remediation shipped** (`fca29cc`, `f5c6603`): critical client→coach self-promotion fixed + verified on the live DB, all 4 mediums + most lows fixed, adversarially re-verified as non-breaking; deferred items (multi-coach RLS, Next 16 upgrade, 2 minor auth lows) documented, not applied; `ONBOARDING_TEST_MODE` deliberately left ON. Plus **per-client billing frequency** (amount-per-payment + 1/3/6/12-month interval, MRR divides by interval) and a **header-aware / value-based roster importer** (creates pending clients, sends no emails) for Sam's 27-client sheet. Full detail in Recently done.
 
 **Earlier (2026-06-04):** **Stripe sandbox flow verified end-to-end** with a real test purchase (£185, card `4242…`): `checkout.session.completed` → pending client appeared in the roster within seconds. Roster follow-up: every row now shows email under the name, a "via Stripe" chip on Stripe rows, and the expanded row has a new **About** block (email, phone/WhatsApp w/ click-to-WhatsApp, birthday, last login, phase·week, member since) plus a **Stripe — Subscription details** block (customer/sub IDs + Open in Stripe deep-link, Stripe rows only). Phone is editable inline. **One pending action: run `db/2026-06-04_client_phone.sql`.** Then ready to repeat the Stripe setup in LIVE mode for real clients. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
 

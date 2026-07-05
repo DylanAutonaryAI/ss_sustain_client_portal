@@ -33,7 +33,7 @@ export async function GET() {
   const admin = await createAdminClient();
   const [roleRes, profileRes] = await Promise.all([
     supabase.rpc('get_my_role'),
-    admin.from('profiles').select('full_name, avatar_url, nickname').eq('id', user.id).maybeSingle(),
+    admin.from('profiles').select('full_name, avatar_url, nickname, email').eq('id', user.id).maybeSingle(),
   ]);
 
   // A transient rpc error must NOT read as "no role assigned" — the login page
@@ -41,6 +41,20 @@ export async function GET() {
   if (roleRes.error) return NextResponse.json({ error: 'role-unavailable' }, { status: 503 });
   const role = roleRes.data;
   const profile = profileRes.data;
+
+  // Self-healing email sync. When a user confirms an email change via Supabase's
+  // verification flow, auth.users.email updates but profiles/clients still hold
+  // the old address. Reconcile them here — a rare path (only right after a
+  // confirmed change), awaited so it lands before the serverless invocation
+  // ends, and never fatal to /api/me.
+  if (user.email && profile?.email && profile.email.toLowerCase() !== user.email.toLowerCase()) {
+    try {
+      await Promise.all([
+        admin.from('profiles').update({ email: user.email }).eq('id', user.id),
+        admin.from('clients').update({ email: user.email }).eq('user_id', user.id),
+      ]);
+    } catch {}
+  }
 
   return NextResponse.json({
     user: {
