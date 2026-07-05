@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rate-limit';
 
 // Changes the user's login email. Done via the admin API with email_confirm so
 // it takes effect immediately (the project has no custom SMTP, so the normal
@@ -15,12 +16,21 @@ export async function POST(request: NextRequest) {
   }
   const newEmail = email.trim().toLowerCase();
 
+  // Throttle so the endpoint can't be used to probe which emails are registered.
+  if (!(await rateLimit(`email-change:${user.id}`, 5, 60 * 60))) {
+    return NextResponse.json({ error: 'Too many attempts — please try again later.' }, { status: 429 });
+  }
+
   const admin = await createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(user.id, {
     email: newEmail,
     email_confirm: true,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Generic message — never echo the raw error (it reveals whether the address
+    // is already registered, an account-membership oracle).
+    return NextResponse.json({ error: 'Could not update your email. Try a different address or contact your coach.' }, { status: 400 });
+  }
 
   // Keep the profile + coach roster in sync with the new email.
   await admin.from('profiles').update({ email: newEmail }).eq('id', user.id);

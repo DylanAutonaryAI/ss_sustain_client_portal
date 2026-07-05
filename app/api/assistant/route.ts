@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
+import { rateLimit } from '@/lib/rate-limit';
 import {
   STATIC_GUIDE,
   dynamicContext,
@@ -22,6 +23,13 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response("The assistant isn't set up yet — ANTHROPIC_API_KEY is missing.", { status: 503 });
+  }
+
+  // Per-user daily cap so one client can't loop the endpoint and run up the
+  // Anthropic bill (denial-of-wallet). Generous for real use; fail-open.
+  const allowed = await rateLimit(`assistant:${user.id}`, 60, 24 * 60 * 60);
+  if (!allowed) {
+    return new Response("You've reached today's message limit for the assistant. Try again tomorrow.", { status: 429 });
   }
 
   const body = await req.json().catch(() => null);

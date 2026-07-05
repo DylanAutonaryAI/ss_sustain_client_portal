@@ -61,10 +61,23 @@ export async function PATCH(request: NextRequest) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await request.json();
-  const { id, ...updates } = body;
+  // Coach-only. (The RLS policy also scopes to coach_id, but gate explicitly.)
+  const { data: role } = await supabase.rpc('get_my_role');
+  if (role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  const body = await request.json();
+  const { id } = body;
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+  // Column allow-list — only these may be updated. Blocks mass-assignment of
+  // sensitive fields (user_id, coach_id, access_granted_at, onboarding_completed_at,
+  // referral_code, stripe ids) even for a coach editing their own rows.
+  const ALLOWED = new Set([
+    'full_name', 'goal', 'status', 'status_reason', 'status_note', 'notes',
+    'next_payment_date', 'monthly_amount', 'billing_interval_months', 'program_start', 'phone',
+  ]);
+  const updates: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) if (k !== 'id' && ALLOWED.has(k)) updates[k] = v;
 
   // Guard the payment amount: only a positive number is valid; coerce anything
   // else to null so a bad value can't drag MRR negative or zero out a payer.
@@ -76,6 +89,9 @@ export async function PATCH(request: NextRequest) {
   if ('billing_interval_months' in updates) {
     const n = Number(updates.billing_interval_months);
     updates.billing_interval_months = [1, 3, 6, 12].includes(n) ? n : 1;
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No updatable fields provided.' }, { status: 400 });
   }
 
   const { data, error } = await supabase

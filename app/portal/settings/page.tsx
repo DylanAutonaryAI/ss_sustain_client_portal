@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const [emailBusy, setEmailBusy]     = useState(false);
   const [emailMsg, setEmailMsg]       = useState({ msg: '', error: false });
 
+  const [pwCur, setPwCur] = useState('');
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
@@ -149,7 +150,8 @@ export default function SettingsPage() {
 
   async function savePassword() {
     setPwMsg({ msg: '', error: false });
-    if (pw1.length < 6) { setPwMsg({ msg: 'Password must be at least 6 characters.', error: true }); return; }
+    if (!pwCur)         { setPwMsg({ msg: 'Enter your current password.', error: true }); return; }
+    if (pw1.length < 8) { setPwMsg({ msg: 'New password must be at least 8 characters.', error: true }); return; }
     if (pw1 !== pw2)    { setPwMsg({ msg: 'Passwords do not match.', error: true }); return; }
     setPwBusy(true);
     // Server route uses the admin API — the browser supabase.auth.updateUser
@@ -164,14 +166,14 @@ export default function SettingsPage() {
       const res = await fetch('/api/profile/password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw1 }),
+        body: JSON.stringify({ password: pw1, currentPassword: pwCur }),
         signal: ctrl.signal,
       });
       // Read as text first so a non-JSON body (e.g. an error page) can't throw.
       const data = await res.json().catch(() => ({} as { error?: string }));
       if (res.ok) {
         setPwMsg({ msg: 'Password changed ✓', error: false });
-        setPw1(''); setPw2('');
+        setPwCur(''); setPw1(''); setPw2('');
       } else {
         setPwMsg({ msg: data.error || 'Could not change password.', error: true });
       }
@@ -268,8 +270,12 @@ export default function SettingsPage() {
             </Card>
 
             {/* Password */}
-            <Card title="Password" desc="Set a new password. At least 6 characters.">
+            <Card title="Password" desc="Set a new password. At least 8 characters.">
               <div className="flex flex-col gap-4">
+                <div>
+                  <label style={labelStyle}>Current password</label>
+                  <input type="password" value={pwCur} onChange={e => setPwCur(e.target.value)} style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} autoComplete="current-password" />
+                </div>
                 <div>
                   <label style={labelStyle}>New password</label>
                   <input type="password" value={pw1} onChange={e => setPw1(e.target.value)} style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} autoComplete="new-password" />

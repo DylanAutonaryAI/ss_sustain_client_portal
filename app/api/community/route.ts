@@ -7,6 +7,15 @@ function getInitials(name: string) {
   return (name || '').trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('');
 }
 
+// First name + last initial, for peer RSVPs shown to other clients (never a full
+// surname). Coaches and the caller themselves still get the full name.
+function shortName(name: string) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Client';
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
 // Resolve the coach whose events this user belongs to, plus the user's display
 // name. A coach owns their own events; a client belongs to their inviting coach.
 async function getContext(supabase: any, userId: string, email: string | undefined) {
@@ -26,8 +35,9 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { coachId, name } = await getContext(supabase, user.id, user.email);
+  const { coachId, role, name } = await getContext(supabase, user.id, user.email);
   if (!coachId) return NextResponse.json({ events: [], myUserId: user.id, myName: name });
+  const isCoach = role === 'coach';
 
   const [{ data: events }, { data: rsvps }] = await Promise.all([
     supabase.from('community_events').select('*').eq('coach_id', coachId).order('date', { ascending: true }),
@@ -46,13 +56,20 @@ export async function GET() {
     time: e.time ?? '',
     duration: e.duration ?? '',
     ...(e.link ? { link: e.link } : {}),
-    rsvps: (byEvent[e.id] ?? []).map((r: any) => ({
-      clientId: r.user_id,
-      clientName: r.client_name ?? 'Client',
-      clientInitials: getInitials(r.client_name ?? 'Client'),
-      status: r.status ?? 'pending',
-      ...(r.reason ? { reason: r.reason } : {}),
-    })),
+    rsvps: (byEvent[e.id] ?? []).map((r: any) => {
+      const full = r.client_name ?? 'Client';
+      const mine = r.user_id === user.id;
+      // Coach or the RSVP's owner: full name + reason. Other clients: first-name
+      // + initial and NO private decline reason (that's the coach's to see).
+      const display = isCoach || mine ? full : shortName(full);
+      return {
+        clientId: r.user_id,
+        clientName: display,
+        clientInitials: getInitials(display),
+        status: r.status ?? 'pending',
+        ...((isCoach || mine) && r.reason ? { reason: r.reason } : {}),
+      };
+    }),
   }));
 
   return NextResponse.json({ events: mapped, myUserId: user.id, myName: name });
