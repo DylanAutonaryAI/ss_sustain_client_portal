@@ -79,14 +79,19 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — testing the two auth-hardening lows
-Invite single-use + email ownership-verify were **built + pushed 2026-07-05** (commit
-`2555550`, auto-deploying to prod). Both prerequisites are **done**: migration
-`db/2026-07-05_invite_single_use.sql` **applied in Supabase**, and Supabase → Auth →
-Email has **Secure email change ON** (so an email change requires confirming on BOTH the
-old and new address — two confirmation emails, change lands only after both links clicked).
-**Next: live smoke test** both flows with a *test* client account (see Recently done for
-exact expected outcomes). `ONBOARDING_TEST_MODE` is deliberately still **ON**.
+## 🟢 Active — nothing in progress
+Both auth-hardening lows are **shipped + live** (commit `2555550`).
+- **Email ownership-verify — VERIFIED WORKING END-TO-END in prod (2026-07-05).** Real
+  client email change → **double-confirm** (Secure email change ON → links to both the old
+  and new inbox) → login flipped to the new address, the old one stopped working. Exactly
+  the intended behaviour.
+- **Invite single-use — shipped, code-verified + adversarially checked; migration applied.**
+  The replay-block (409 on re-submitting a used invite within its ~1h token window) was NOT
+  manually smoke-tested — low-risk, optional to exercise later (re-open a used invite link,
+  or curl `/api/set-password` twice with the same tokens → expect HTTP 409 "already been
+  used"). Fails safe if ever wrong (set-password still works).
+
+`ONBOARDING_TEST_MODE` is deliberately still **ON** — not going live yet.
 
 ---
 
@@ -730,8 +735,10 @@ invite-token **single-use** (`clients.invite_accepted_at` + 409 replay-block in
 the new address instead of switching instantly; `/api/me` self-heals the profile/roster
 email post-confirm). Typecheck + prod build clean; guard/validation paths driven live.
 **Pushed + deployed** (commit `2555550`); migration applied; Supabase **Secure email change
-ON** (double-confirm). Now in live smoke-testing. Also recorded the **stay-on-Next-14**
-decision. Prior entry below.
+ON** (double-confirm). **Email ownership-verify VERIFIED WORKING end-to-end in prod
+2026-07-05** (real change → both-inbox confirm → login flipped). Invite single-use shipped +
+code/adversarially verified (manual replay smoke-test optional). Also recorded the
+**stay-on-Next-14** decision. Prior entry below.
 
 **Earlier 2026-07-05 — Security audit + remediation shipped** (`fca29cc`, `f5c6603`): critical client→coach self-promotion fixed + verified on the live DB, all 4 mediums + most lows fixed, adversarially re-verified as non-breaking; deferred items (multi-coach RLS, Next 16 upgrade, 2 minor auth lows) documented, not applied; `ONBOARDING_TEST_MODE` deliberately left ON. Plus **per-client billing frequency** (amount-per-payment + 1/3/6/12-month interval, MRR divides by interval) and a **header-aware / value-based roster importer** (creates pending clients, sends no emails) for Sam's 27-client sheet. Full detail in Recently done.
 
