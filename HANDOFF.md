@@ -15,7 +15,30 @@
 
 ---
 
-## 📌 Latest handoff note (2026-06-04) — Stripe sandbox flow verified + roster About block
+## 📌 Latest handoff note (2026-07-05) — Security remediation shipped + per-client billing
+Two things landed this pass, both **pushed to `master` (auto-deployed)** and, where DB
+was involved, **applied + verified against the live database**. Full detail in Recently
+done; the short version:
+
+1. **Full security audit + remediation — SHIPPED, non-breaking.** A read-only multi-agent
+   audit (5 areas + adversarial verification) found **1 critical, 0 high, 4 medium, 21
+   low**. The **critical** (any authenticated user could self-promote client→coach via an
+   unguarded `profiles` UPDATE) is **fixed and verified against the live DB**. All 4
+   mediums + most lows fixed. A second adversarial pass confirmed **zero broken flows,
+   zero ineffective fixes**. Commits `fca29cc` + `f5c6603`.
+2. **Per-client billing frequency + robust roster import.** `monthly_amount` is now
+   *amount per payment*; MRR divides by a new `billing_interval_months` (1/3/6/12). The
+   client importer is header-aware + value-based (any column order) and creates clients
+   **without sending emails**. Commits `ba1056a`, `ef70aec`, `cdd3497`, `52d50a6`.
+
+**Deferred on purpose — do NOT apply without a decision** (each documented in Recently
+done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach), the
+Next 16 upgrade (breaking; mitigated by Vercel), and two minor auth lows needing bigger
+flows. **`ONBOARDING_TEST_MODE` is deliberately still ON — not going live yet.**
+
+---
+
+## 📎 Prior note (2026-06-04) — Stripe sandbox flow verified + roster About block
 **Stripe sandbox → portal verified end-to-end** with a real test purchase (£185, card
 `4242…`) on 2026-06-04 — pending client appeared in the roster within seconds. Roster
 follow-up shipped same day: every row now shows the **email** under the name, a
@@ -50,7 +73,74 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — BOTH onboarding videos now embedded (2026-07-03), no content blockers left
+## 🟢 Active — nothing in progress (security pass shipped 2026-07-05)
+The 2026-07-04→05 work is **done and pushed**; nothing is mid-flight. What remains before
+real clients go live is **operational only** — see the carry-forward at the top and Still
+to do. `ONBOARDING_TEST_MODE` is deliberately still **ON**.
+
+---
+
+## 🟢 Recently done — 2026-07-04→05 pass
+
+### Security audit + remediation (SHIPPED, verified non-breaking) — `fca29cc`, `f5c6603`
+A read-only multi-agent audit (5 independent areas + adversarial verify + a completeness
+loop) graded the codebase: **1 critical, 0 high, 4 medium, 21 low**. Then a fix pass that
+was explicitly constrained to *not change how any legit flow works*, re-checked by a
+3-lens adversarial workflow (**result: zero broken flows, zero ineffective fixes**; 3
+nits found and fixed).
+- **CRITICAL — client→coach self-promotion — FIXED + verified on the live DB.** The
+  `profiles` UPDATE policy had a null WITH CHECK and `authenticated`/`anon` held an UPDATE
+  grant on the `role` column, so any signed-in user could promote themselves to coach.
+  `db/2026-07-04_fix_profiles_role_escalation.sql` **revokes UPDATE on `profiles` from
+  `authenticated`/`anon`** — grant is now only `postgres`/`service_role`. Verified by
+  direct query: 1 coach row (Sam), 0 unexpected roles. The browser never writes `profiles`
+  (confirmed: zero direct browser table writes), so nothing legit breaks.
+- **All 4 mediums fixed:** community RSVP privacy (clients now see peers as first-name +
+  initial, **no** private decline reasons; coach still sees everything —
+  `app/api/community/route.ts`); assistant **denial-of-wallet** (per-user 60/day cap,
+  fail-open — `app/api/assistant/route.ts`); referral **spam + code-enumeration** (per-IP
+  rate limit, unique `(referrer, lower(email))` index, self-referral drop, and an
+  **identical `{ok:true}` response** for valid/invalid/self so it can't be used to test
+  codes — `app/api/referral/submit/route.ts`).
+- **Most lows / hardening:** security headers (X-Frame-Options DENY, CSP
+  `frame-ancestors 'none'`, nosniff, referrer, permissions — **scoped so Loom embeds +
+  next-image are untouched**, `next.config.mjs`); `signout` POST-only (CSRF); `PATCH
+  /api/clients` now coach-gated + a **column allow-list** (blocks mass-assignment of
+  `role`/`access_granted_at`/etc.); password change requires **current-password re-auth**
+  + min 8 + throttle; email change genericised + throttled; avatar **magic-byte sniff** +
+  fixed overwrite path; RPC execute grants + the `clients` ALL policy locked to
+  authenticated coaches (`db/2026-07-04_fix_clients_policy.sql`).
+- **New infra:** `lib/rate-limit.ts` — DB-backed fixed-window limiter, **fail-open**
+  (`db/2026-07-04_rate_limits.sql`); `db/2026-07-04_security_hardening.sql` (RPC grants +
+  referral dedup index). All four 2026-07-04 security migrations **applied + verified**.
+- **DEFERRED — documented, NOT applied (needs a decision, not a to-do):**
+  - `db/DEFERRED_multi_coach_rls.sql` — scopes the `USING(true)` content/community/rsvp
+    read policies per-coach. **Latent today** (one coach ⇒ current behaviour is intended);
+    it rewrites load-bearing read policies, so **apply + test on a preview BEFORE adding a
+    2nd coach.**
+  - **Next.js CVEs** — only fixable by a **Next 16 major upgrade (breaking)**; mitigated by
+    Vercel's platform. Needs its own tested effort.
+  - Two minor lows needing bigger flows: invite-token single-use, email ownership-verify
+    (needs working SMTP templates).
+
+### Per-client billing frequency + robust import — `ba1056a`, `ef70aec`, `cdd3497`, `52d50a6`
+- **`monthly_amount` redefined as *amount per payment* (installment).** MRR is now
+  `monthly_amount / billing_interval_months` (`lib/payments.ts`). New
+  `clients.billing_interval_months` ∈ {1,3,6,12}
+  (`db/2026-07-04_client_billing_interval.sql` + `_client_monthly_amount.sql`, applied).
+  Roster Payments block: **"Amount per payment" + "Billing frequency" dropdown**;
+  `mark-paid` rolls `next_payment_date` by the interval; the Stripe webhook derives the
+  interval from the price.
+- **Non-Stripe flow streamlined:** monthly rate + one-click "received"; **payments are now
+  deletable** on the Revenue page if entered wrong.
+- **Roster importer** (`components/coach/ImportClientsModal.tsx`): header-aware column
+  mapping (any order) + value-based multi-row inference. **Import creates pending clients
+  and sends NO emails** — for Sam's 27-client sheet.
+- **`scripts/run-migration.mjs`** — pg-based migration runner (reads `SUPABASE_DB_URL`,
+  transaction-wrapped, refuses drop/truncate/delete without `--force`) so migrations can
+  be applied directly.
+
+### Onboarding videos — BOTH embedded (2026-07-03)
 **Onboarding steps 1 (welcome) and 2 (portal walkthrough) are BOTH DONE.** Sam sent
 each as an **mp4** (not a Loom). Both masters are HEVC (browsers can't play HEVC) and
 were re-encoded to committed, web-ready H.264 copies; the masters are **gitignored**:
@@ -552,10 +642,16 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `position:fixed` modal and breaks its full-screen overlay (this already bit us once).
 - **All migrations applied ✅:** `onboarding_progress`, `page_views`, `referral`,
   `last_login`, `client_program_start`, `client_status_reason`, `tracker`,
-  `notification_seen` (run 2026-05-29), `client_access` (run 2026-05-30), and
-  `stripe_integration` (run 2026-06-04). **⚠️ `client_phone` (added 2026-06-04) NOT YET
-  RUN — see Active.** If Vercel ever points at a *different* Supabase than local
-  `.env.local`, re-run them there.
+  `notification_seen` (run 2026-05-29), `client_access` (run 2026-05-30),
+  `stripe_integration` (run 2026-06-04), and the **2026-07-04 batch** —
+  `client_monthly_amount`, `client_billing_interval`, `fix_profiles_role_escalation`,
+  `security_hardening`, `rate_limits`, `fix_clients_policy` (all applied + verified by
+  direct query). **⚠️ `client_phone` (added 2026-06-04) — confirm it's run** (needed for
+  the roster phone/WhatsApp field + Stripe `customer_details.phone`).
+  **⛔ `db/DEFERRED_multi_coach_rls.sql` is intentionally NOT applied** — do not run it
+  until a 2nd coach is being added, and test on a preview first (see the security entry in
+  Recently done). If Vercel ever points at a *different* Supabase than local `.env.local`,
+  re-run them there.
 - **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
   If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
   — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
@@ -568,6 +664,8 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 
 ---
 
-**Last updated:** 2026-06-04 — **Stripe sandbox flow verified end-to-end** with a real test purchase (£185, card `4242…`): `checkout.session.completed` → pending client appeared in the roster within seconds. Roster follow-up: every row now shows email under the name, a "via Stripe" chip on Stripe rows, and the expanded row has a new **About** block (email, phone/WhatsApp w/ click-to-WhatsApp, birthday, last login, phase·week, member since) plus a **Stripe — Subscription details** block (customer/sub IDs + Open in Stripe deep-link, Stripe rows only). Phone is editable inline. **One pending action: run `db/2026-06-04_client_phone.sql`.** Then ready to repeat the Stripe setup in LIVE mode for real clients. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
+**Last updated:** 2026-07-05 — **Security audit + remediation shipped** (`fca29cc`, `f5c6603`): critical client→coach self-promotion fixed + verified on the live DB, all 4 mediums + most lows fixed, adversarially re-verified as non-breaking; deferred items (multi-coach RLS, Next 16 upgrade, 2 minor auth lows) documented, not applied; `ONBOARDING_TEST_MODE` deliberately left ON. Plus **per-client billing frequency** (amount-per-payment + 1/3/6/12-month interval, MRR divides by interval) and a **header-aware / value-based roster importer** (creates pending clients, sends no emails) for Sam's 27-client sheet. Full detail in Recently done.
+
+**Earlier (2026-06-04):** **Stripe sandbox flow verified end-to-end** with a real test purchase (£185, card `4242…`): `checkout.session.completed` → pending client appeared in the roster within seconds. Roster follow-up: every row now shows email under the name, a "via Stripe" chip on Stripe rows, and the expanded row has a new **About** block (email, phone/WhatsApp w/ click-to-WhatsApp, birthday, last login, phase·week, member since) plus a **Stripe — Subscription details** block (customer/sub IDs + Open in Stripe deep-link, Stripe rows only). Phone is editable inline. **One pending action: run `db/2026-06-04_client_phone.sql`.** Then ready to repeat the Stripe setup in LIVE mode for real clients. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
 
 **Plus (rebased in on top):** the **login "Signing in…" wedge is cracked** — auth-js awaits `onAuthStateChange` subscribers inside `signInWithPassword`; the subscriber is now fire-and-forget, the login role check goes via `/api/me`, and every auth call behind a button is timeout-raced. **See the AUTH INVARIANTS in Watch out before touching auth.**
