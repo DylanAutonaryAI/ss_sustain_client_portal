@@ -37,11 +37,10 @@ done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach) 
 Next 14 for now**, go 14→15 first when picked up). **`ONBOARDING_TEST_MODE` is deliberately
 still ON — not going live yet.**
 
-**The two minor auth lows are now BUILT (2026-07-05)** — invite-token single-use +
-email ownership-verify. See Recently done. One carry-forward: **run
-`db/2026-07-05_invite_single_use.sql`** (adds `clients.invite_accepted_at`; the code
-fails safe until it's applied) and **confirm Supabase → Auth has email confirmations ON**
-so the email change actually verifies (see Watch out).
+**The two minor auth lows are now BUILT + SHIPPED (2026-07-05, commit `2555550`)** —
+invite-token single-use + email ownership-verify. Migration **applied**; Supabase **Secure
+email change ON** (double-confirm). Both live in prod, **in live smoke-testing**. See
+Recently done + Watch out.
 
 ---
 
@@ -80,12 +79,14 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — nothing in progress
-The 2026-07-04→05 security pass is **done and pushed**. The two deferred auth lows
-(invite single-use + email ownership-verify) were **built 2026-07-05** (see Recently done)
-— **committed locally, NOT yet pushed**, pending: (1) run
-`db/2026-07-05_invite_single_use.sql`, (2) confirm the Supabase email-confirmation setting.
-`ONBOARDING_TEST_MODE` is deliberately still **ON**.
+## 🟢 Active — testing the two auth-hardening lows
+Invite single-use + email ownership-verify were **built + pushed 2026-07-05** (commit
+`2555550`, auto-deploying to prod). Both prerequisites are **done**: migration
+`db/2026-07-05_invite_single_use.sql` **applied in Supabase**, and Supabase → Auth →
+Email has **Secure email change ON** (so an email change requires confirming on BOTH the
+old and new address — two confirmation emails, change lands only after both links clicked).
+**Next: live smoke test** both flows with a *test* client account (see Recently done for
+exact expected outcomes). `ONBOARDING_TEST_MODE` is deliberately still **ON**.
 
 ---
 
@@ -693,11 +694,8 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `security_hardening`, `rate_limits`, `fix_clients_policy` (all applied + verified by
   direct query). **⚠️ `client_phone` (added 2026-06-04) — confirm it's run** (needed for
   the roster phone/WhatsApp field + Stripe `customer_details.phone`).
-  **⚠️ `db/2026-07-05_invite_single_use.sql` — NOT yet applied** (this machine's
-  `.env.local` has no `SUPABASE_DB_URL`, so the runner couldn't run it). Additive + safe
-  (`add column if not exists clients.invite_accepted_at`); the invite single-use code fails
-  safe until it's applied. Run it in the Supabase SQL editor (or add `SUPABASE_DB_URL` and
-  `node scripts/run-migration.mjs db/2026-07-05_invite_single_use.sql`).
+  **✅ `db/2026-07-05_invite_single_use.sql` — APPLIED in Supabase (2026-07-05)** via the SQL
+  editor (added `clients.invite_accepted_at`). Invite single-use enforcement is now live.
   **⛔ `db/DEFERRED_multi_coach_rls.sql` is intentionally NOT applied** — do not run it
   until a 2nd coach is being added, and test on a preview first (see the security entry in
   Recently done). If Vercel ever points at a *different* Supabase than local `.env.local`,
@@ -711,15 +709,17 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 - **Refresh-token health (open):** verify `POST /auth/v1/token?grant_type=refresh_token`
   returns 2xx after a clean re-login under the new keys. If it 4xx's, browser sessions can't
   auto-extend past ~1h — see Still to do.
-- **Email ownership-verify depends on a Supabase setting (2026-07-05).** The new email-change
-  flow (`/api/profile/email` → server `auth.updateUser({ email })`) only actually *verifies*
-  ownership if **Supabase → Authentication → sign-in/providers → Email has confirmations
-  enabled** (and, ideally, "Secure email change" ON for double-confirm). SMTP is already
-  verified (Resend), so the confirmation email WILL deliver. If confirmations are OFF, the
-  change applies instantly (route detects this and syncs profiles/clients on the spot) —
-  functional, just not verifying. **Confirm this toggle before relying on the verification.**
-  The confirmation link redirects to `…/portal/settings`; the actual switch happens at
-  Supabase's verify endpoint, and `/api/me` reconciles `profiles`/`clients` on the next load.
+- **Email ownership-verify — Supabase setting confirmed (2026-07-05).** Supabase → Auth →
+  Email has **Secure email change ON**, so `/api/profile/email` → server
+  `auth.updateUser({ email })` runs the strict **double-confirm**: a confirmation goes to
+  BOTH the old and new address and the login email changes only after BOTH links are
+  clicked. Implication: a client must be able to open their **old** inbox to change their
+  email (if they've lost access to it, they need coach/admin help — expected posture).
+  SMTP is verified (Resend), so the emails deliver. The confirmation link redirects to
+  `…/portal/settings`; the switch happens at Supabase's verify endpoint, and `/api/me`
+  reconciles `profiles`/`clients` on the next load. (If Secure email change were ever
+  toggled OFF, only the new address confirms; if email confirmations were fully OFF the
+  route detects the instant apply and syncs on the spot — no regression either way.)
 
 ---
 
@@ -729,9 +729,9 @@ invite-token **single-use** (`clients.invite_accepted_at` + 409 replay-block in
 **email ownership-verify** (`/api/profile/email` now sends a Supabase confirmation link to
 the new address instead of switching instantly; `/api/me` self-heals the profile/roster
 email post-confirm). Typecheck + prod build clean; guard/validation paths driven live.
-**Committed locally, not pushed** — pending the migration + a Supabase email-confirmation
-setting check (see Watch out). Also recorded the **stay-on-Next-14** decision. Prior
-entry below.
+**Pushed + deployed** (commit `2555550`); migration applied; Supabase **Secure email change
+ON** (double-confirm). Now in live smoke-testing. Also recorded the **stay-on-Next-14**
+decision. Prior entry below.
 
 **Earlier 2026-07-05 — Security audit + remediation shipped** (`fca29cc`, `f5c6603`): critical client→coach self-promotion fixed + verified on the live DB, all 4 mediums + most lows fixed, adversarially re-verified as non-breaking; deferred items (multi-coach RLS, Next 16 upgrade, 2 minor auth lows) documented, not applied; `ONBOARDING_TEST_MODE` deliberately left ON. Plus **per-client billing frequency** (amount-per-payment + 1/3/6/12-month interval, MRR divides by interval) and a **header-aware / value-based roster importer** (creates pending clients, sends no emails) for Sam's 27-client sheet. Full detail in Recently done.
 
