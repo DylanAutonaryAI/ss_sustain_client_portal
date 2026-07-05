@@ -56,9 +56,9 @@ has a Stripe sub. **Phone is editable inline in the About block** with a click-t
 link — Sam's primary client comms channel, now one click away.
 
 ⚠️ **Carry-forward before this works in prod (in order):**
-1. **Run `db/2026-06-04_client_phone.sql`** in Supabase — adds `clients.phone`. Without
-   it, saving phone fails and the Stripe webhook errors if Stripe ever returns a phone
-   on `customer_details`.
+1. ~~Run `db/2026-06-04_client_phone.sql`~~ **✅ DONE (2026-07-05).** `clients.phone`
+   applied via the SQL editor (`add column if not exists`, idempotent). Roster
+   phone/WhatsApp field + Stripe `customer_details.phone` are now safe.
 2. **Repeat the sandbox flow in LIVE mode** when Sam's ready. Create a Live-mode event
    destination at the same URL, replace both Vercel env vars with live `sk_live_…` and
    `whsec_…`. **Live keys go straight into Vercel — never paste them in chat.**
@@ -663,6 +663,13 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   keys** (legacy JWT keys disabled): `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_…`,
   `SUPABASE_SERVICE_ROLE_KEY` = `sb_secret_…` (Sensitive, server-only) in the **Value**
   field. **Framework Preset must stay "Next.js"** (if it flips to "Other", every page 404s).
+- **⚠️ This machine's local `.env.local` still holds the OLD legacy Supabase keys** (found
+  2026-07-05: a REST probe returned *"Legacy API keys are disabled"*, disabled 2026-05-28).
+  So `npm run dev` HERE can't do admin/DB calls against Supabase, and scripts that read the
+  local service-role key will 401. Prod (Vercel) is fine — it has the new `sb_secret_…` /
+  `sb_publishable_…` keys. To fix local dev on this machine, pull the new keys into
+  `.env.local` (e.g. `vercel env pull`) — the anon + service-role values, plus optionally
+  `SUPABASE_DB_URL` so `scripts/run-migration.mjs` works here.
 - **`ONBOARDING_TEST_MODE = true`** (`lib/onboarding.ts`) forces onboarding on every login +
   shows the admin skip button **in production** (for testing). **Set it `false` at go-live.**
 - **Browser auth uses a no-op `lock`** (`lib/supabase/client.ts`) — both `navigator.locks`
@@ -697,8 +704,9 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `stripe_integration` (run 2026-06-04), and the **2026-07-04 batch** —
   `client_monthly_amount`, `client_billing_interval`, `fix_profiles_role_escalation`,
   `security_hardening`, `rate_limits`, `fix_clients_policy` (all applied + verified by
-  direct query). **⚠️ `client_phone` (added 2026-06-04) — confirm it's run** (needed for
-  the roster phone/WhatsApp field + Stripe `customer_details.phone`).
+  direct query). **✅ `client_phone` (2026-06-04) — APPLIED (confirmed 2026-07-05)**, re-run
+  idempotently via the SQL editor; roster phone/WhatsApp + Stripe `customer_details.phone`
+  are covered.
   **✅ `db/2026-07-05_invite_single_use.sql` — APPLIED in Supabase (2026-07-05)** via the SQL
   editor (added `clients.invite_accepted_at`). Invite single-use enforcement is now live.
   **⛔ `db/DEFERRED_multi_coach_rls.sql` is intentionally NOT applied** — do not run it
