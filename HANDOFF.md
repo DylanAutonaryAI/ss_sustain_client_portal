@@ -801,6 +801,18 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 - **Invite emails work** — the Resend **domain `sssustain.com` is verified** and the Supabase
   SMTP sender is on that domain, so invites reach real clients (not just the Resend account
   owner). Invite tokens are single-use; re-add a client to get a fresh link.
+- **🔴 Refresh-token health — now CONFIRMED causing real problems (2026-07-06).** A long coach
+  editing session on the roster **silently lost saves** partway through: Sam updated payments/info
+  for ~everyone and "barely any saved." Root cause = his access token expired mid-session and
+  didn't auto-renew → every `PATCH /api/clients` after ~1h returned 401 → and the "Save changes"
+  button had **no error branch**, so failures were invisible (data loss with no indication). This
+  is real-world evidence the `grant_type=refresh_token` grant is broken under the new keys.
+  **Two fixes:** (1) SHIPPED `d4e19ed` — `saveNote` now surfaces the error, special-cases 401 as
+  "session expired — refresh + re-sign-in", shows Saving…/disabled. (2) DURABLE fix (Supabase, do
+  it): **raise Access token (JWT) expiry** (Authentication → Sessions) 3600 → **604800 (1 week)**
+  so the token can't lapse mid-session — this also fixes "stay logged in". The proper root fix is
+  still to repair the refresh grant (JWT signing keys), but the expiry bump is the immediate,
+  effective stopgap. Original open item below still stands:
 - **Refresh-token health (open):** verify `POST /auth/v1/token?grant_type=refresh_token`
   returns 2xx after a clean re-login under the new keys. If it 4xx's, browser sessions can't
   auto-extend past ~1h — see Still to do.
