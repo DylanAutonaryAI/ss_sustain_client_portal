@@ -1,14 +1,14 @@
 import type { OnboardingStep } from '@/lib/types';
 
-// ⚠️ MASTER SWITCH — onboarding gate on/off.
-//   false (current): NO client is EVER routed through onboarding. After they set
-//     their password they land straight on the portal home — they never see the
-//     onboarding page, videos, or steps. Used to move Sam's existing clients off
-//     Notion without making them sit through the flow.
-//   true: the onboarding gate is active (its behaviour then depends on
-//     ONBOARDING_TEST_MODE below). Flip back to true when onboarding is wanted for
-//     new (Stripe) clients coming in via the website.
-export const ONBOARDING_ENABLED = false;
+// ⚠️ GLOBAL MASTER SWITCH for onboarding.
+//   true (current): onboarding is decided PER CLIENT by clients.onboarding_required
+//     — set via the "Show onboarding flow" checkbox in the coach's Add-client modal.
+//     A client sees the flow only if their flag is true AND they haven't completed
+//     it yet. Everyone else (all existing / bulk-imported clients — default false)
+//     goes straight to the portal home.
+//   false: hard kill switch — NO client is ever routed through onboarding, no matter
+//     their per-client flag. Only for disabling the whole flow in an emergency.
+export const ONBOARDING_ENABLED = true;
 
 // TESTING MODE — only has any effect when ONBOARDING_ENABLED is true.
 // When true, a CLIENT is routed through onboarding on EVERY login regardless of

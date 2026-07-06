@@ -48,12 +48,16 @@ export default function PortalShell({ children }: { children: React.ReactNode })
         if (cancelled) return;
         // Only gate real clients; coaches / accounts without a client row pass through.
         const isClient = !!data?.isClient;
-        // TESTING MODE (ONBOARDING_TEST_MODE, or local dev): always send the client
-        // through onboarding on every login UNLESS they've hit the admin skip for
-        // this session. At go-live (flag off): gate only until they've completed it.
+        // Per-client flag (clients.onboarding_required) — a client is only routed
+        // through onboarding if the coach ticked it for them. Existing / bulk clients
+        // default false → straight to the portal.
+        const required = !!data?.onboardingRequired;
+        // TESTING MODE (ONBOARDING_TEST_MODE, or local dev): for a client who DOES
+        // require onboarding, re-run it every login unless they've hit the admin skip
+        // this session. Normal mode: gate only until they've completed it once.
         const testMode = ONBOARDING_TEST_MODE || process.env.NODE_ENV === 'development';
         const skipped = testMode && sessionStorage.getItem('ss-dev-skip');
-        const needsOnboarding = isClient && (testMode ? !skipped : !data?.completedAt);
+        const needsOnboarding = isClient && required && (testMode ? !skipped : !data?.completedAt);
         if (needsOnboarding) router.push('/onboarding');
         else setGateChecked(true);
       })

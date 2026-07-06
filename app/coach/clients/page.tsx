@@ -58,6 +58,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [status, setStatus]         = useState<ClientStatus>('Active');
   const [notes, setNotes]           = useState('');
   const [pending, setPending]       = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [error, setError]           = useState('');
   const [loading, setLoading]       = useState(false);
   const [sent, setSent]             = useState(false);
@@ -93,6 +94,7 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
         notes: notes.trim(),
         since: getSince(),
         pending,
+        onboarding_required: showOnboarding,
       }),
     });
 
@@ -222,6 +224,28 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
               <br />
               <span style={{ color: 'var(--text3)' }}>
                 Use this when they&rsquo;ve paid but haven&rsquo;t finished onboarding outside the portal (Calendly call, signed welcome pack). You&rsquo;ll press <em>Grant access</em> in their row when ready.
+              </span>
+            </div>
+          </label>
+
+          {/* Onboarding toggle — per-client. Off by default (existing clients skip
+              onboarding); tick it for a brand-new client who should be walked
+              through the welcome videos + setup before reaching the portal. */}
+          <label
+            className="flex items-start gap-2.5 px-3 py-2.5 rounded-[8px] cursor-pointer transition-colors duration-150"
+            style={{ background: showOnboarding ? 'rgba(16,185,129,0.08)' : 'var(--bg2)', border: `1px solid ${showOnboarding ? 'rgba(16,185,129,0.25)' : 'var(--border2)'}` }}
+          >
+            <input
+              type="checkbox"
+              checked={showOnboarding}
+              onChange={(e) => setShowOnboarding(e.target.checked)}
+              style={{ marginTop: 2, accentColor: 'var(--accent)' }}
+            />
+            <div className="text-[12px] leading-[1.5]" style={{ color: 'var(--text2)' }}>
+              <span style={{ color: 'var(--text)', fontWeight: 600 }}>Show onboarding flow.</span>
+              <br />
+              <span style={{ color: 'var(--text3)' }}>
+                Tick for a brand-new client — they&rsquo;ll be walked through the welcome videos &amp; setup steps before the portal unlocks (until they finish it). Leave off for existing clients, who go straight to their home page.
               </span>
             </div>
           </label>

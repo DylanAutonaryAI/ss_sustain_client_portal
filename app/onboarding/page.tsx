@@ -58,6 +58,10 @@ export default function OnboardingPage() {
         const res = await fetch('/api/onboarding/me', { cache: 'no-store' });
         const data = await res.json();
         if (!active) return;
+        // This client doesn't require onboarding (or isn't a client) → they were
+        // never routed here. Bounce to the portal so a stray visit can't show the
+        // flow to someone who shouldn't see it.
+        if (res.ok && !data.onboardingRequired) { router.replace('/portal/home'); return; }
         if (res.ok) {
           const done: string[] = data.completed ?? [];
           setCompleted(new Set(done));
@@ -73,7 +77,7 @@ export default function OnboardingPage() {
       }
     })();
     return () => { active = false; };
-  }, [total]);
+  }, [total, router]);
 
   const openStep = () => {
     if (step.url) window.open(step.url, '_blank', 'noopener,noreferrer');

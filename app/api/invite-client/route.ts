@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { email, full_name, goal, status, next_payment_date, notes, since, pending, phone } = body;
+  const { email, full_name, goal, status, next_payment_date, notes, since, pending, phone, onboarding_required } = body;
 
   if (!email || !full_name) {
     return NextResponse.json({ error: 'email and full_name are required' }, { status: 400 });
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       referral_code: generateReferralCode(full_name),
       access_granted_at: pending ? null : new Date().toISOString(),
       phone: phone ?? null,
+      onboarding_required: onboarding_required === true,
     })
     .select()
     .single();

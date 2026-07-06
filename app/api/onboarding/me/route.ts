@@ -20,13 +20,13 @@ export async function GET() {
     const admin = await createAdminClient();
     const { data: client } = await admin
       .from('clients')
-      .select('id, onboarding_completed_at')
+      .select('id, onboarding_completed_at, onboarding_required')
       .eq('user_id', user.id)
       .maybeSingle();
 
     // No client row (e.g. a coach) → onboarding doesn't apply.
     if (!client) {
-      return NextResponse.json({ completed: [], completedAt: null, isClient: false });
+      return NextResponse.json({ completed: [], completedAt: null, isClient: false, onboardingRequired: false });
     }
 
     const { data: rows } = await admin
@@ -38,9 +38,12 @@ export async function GET() {
       completed: (rows ?? []).map((r) => r.step_key),
       completedAt: client.onboarding_completed_at,
       isClient: true,
+      // Per-client flag — the gate only routes here when this is true and the
+      // client hasn't completed onboarding. Default false for existing clients.
+      onboardingRequired: !!client.onboarding_required,
     });
   } catch {
-    return NextResponse.json({ isClient: false, completed: [], completedAt: null });
+    return NextResponse.json({ isClient: false, completed: [], completedAt: null, onboardingRequired: false });
   }
 }
 
