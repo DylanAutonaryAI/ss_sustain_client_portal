@@ -438,6 +438,8 @@ export default function ClientRosterPage() {
   const [payingId, setPayingId]   = useState<string | null>(null);
   const [customPhase, setCustomPhase] = useState<Record<string, boolean>>({});
   const [saved, setSaved]         = useState<string | null>(null);
+  const [savingId, setSavingId]   = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<Record<string, string>>({});
   const [showAdd, setShowAdd]     = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [grantingAll, setGrantingAll] = useState(false);
@@ -507,44 +509,61 @@ export default function ClientRosterPage() {
     const mAmt = Number(d.monthlyAmount);
     const monthlyAmount = d.monthlyAmount.trim() && !isNaN(mAmt) && mAmt > 0 ? mAmt : null;
     const billingInterval = [1, 3, 6, 12].includes(d.billingInterval) ? d.billingInterval : 1;
-    const res = await fetch('/api/clients', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: c.id,
-        notes: d.notes,
-        next_payment_date: d.paymentDate || null,
-        monthly_amount: monthlyAmount,
-        billing_interval_months: billingInterval,
-        goal: goal || null,
-        program_start: d.programStart || null,
-        status: d.status,
-        status_reason: statusReason,
-        status_note: statusNote,
-        phone,
-      }),
-    });
-    if (res.ok) {
-      setRoster(prev => prev.map(x =>
-        x.id === c.id
-          ? {
-              ...x,
-              notes: d.notes,
-              nextPaymentDate: d.paymentDate || undefined,
-              payment: calcPaymentStatus(d.paymentDate || undefined),
-              goal: goal || '—',
-              programStart: d.programStart || undefined,
-              status: d.status,
-              statusReason: statusReason ?? undefined,
-              statusNote: statusNote ?? undefined,
-              phone: phone ?? undefined,
-              monthlyAmount: monthlyAmount ?? undefined,
-              billingIntervalMonths: billingInterval,
-            }
-          : x
-      ));
-      setSaved(c.id);
-      setTimeout(() => setSaved(null), 2000);
+    setSavingId(c.id);
+    setSaveError(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: c.id,
+          notes: d.notes,
+          next_payment_date: d.paymentDate || null,
+          monthly_amount: monthlyAmount,
+          billing_interval_months: billingInterval,
+          goal: goal || null,
+          program_start: d.programStart || null,
+          status: d.status,
+          status_reason: statusReason,
+          status_note: statusNote,
+          phone,
+        }),
+      });
+      if (res.ok) {
+        setRoster(prev => prev.map(x =>
+          x.id === c.id
+            ? {
+                ...x,
+                notes: d.notes,
+                nextPaymentDate: d.paymentDate || undefined,
+                payment: calcPaymentStatus(d.paymentDate || undefined),
+                goal: goal || '—',
+                programStart: d.programStart || undefined,
+                status: d.status,
+                statusReason: statusReason ?? undefined,
+                statusNote: statusNote ?? undefined,
+                phone: phone ?? undefined,
+                monthlyAmount: monthlyAmount ?? undefined,
+                billingIntervalMonths: billingInterval,
+              }
+            : x
+        ));
+        setSaved(c.id);
+        setTimeout(() => setSaved(null), 2000);
+      } else {
+        // Surface the failure instead of swallowing it. The old code had no
+        // `else`, so a failed save (e.g. a mid-session token-expiry 401) looked
+        // identical to success — the coach lost data with zero indication.
+        const data = await res.json().catch(() => ({} as { error?: string }));
+        const msg = res.status === 401
+          ? 'Your session expired — refresh the page and sign in again, then Save. (Your edits above are still here.)'
+          : (data.error || `Couldn't save (error ${res.status}). Please try again.`);
+        setSaveError(prev => ({ ...prev, [c.id]: msg }));
+      }
+    } catch {
+      setSaveError(prev => ({ ...prev, [c.id]: 'Could not reach the server. Check your connection and Save again.' }));
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -1196,16 +1215,23 @@ export default function ClientRosterPage() {
                       </button>
                     </div>
 
+                    {saveError[c.id] && (
+                      <div className="col-span-2 text-[12px] px-3 py-2 rounded-[7px]" style={{ color: 'var(--red)', background: 'rgba(240,79,79,0.08)', border: '1px solid rgba(240,79,79,0.2)' }}>
+                        {saveError[c.id]}
+                      </div>
+                    )}
+
                     {/* Actions spanning full width */}
                     <div className="col-span-2 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)' }}>
                       <button
                         onClick={() => saveNote(c)}
-                        className="px-[18px] py-[9px] rounded-[8px] text-[13px] font-semibold text-white transition-all duration-150"
-                        style={{ background: saved === c.id ? '#0d8f3e' : 'var(--accent)', border: 'none', cursor: 'pointer' }}
-                        onMouseEnter={(e) => { if (saved !== c.id) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
+                        disabled={savingId === c.id}
+                        className="px-[18px] py-[9px] rounded-[8px] text-[13px] font-semibold text-white transition-all duration-150 disabled:opacity-60"
+                        style={{ background: saved === c.id ? '#0d8f3e' : 'var(--accent)', border: 'none', cursor: savingId === c.id ? 'default' : 'pointer' }}
+                        onMouseEnter={(e) => { if (saved !== c.id && savingId !== c.id) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(1.08)'; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = ''; }}
                       >
-                        {saved === c.id ? 'Saved ✓' : 'Save changes'}
+                        {savingId === c.id ? 'Saving…' : saved === c.id ? 'Saved ✓' : 'Save changes'}
                       </button>
                       <button
                         onClick={() => deleteClient(c)}
