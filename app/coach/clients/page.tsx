@@ -9,6 +9,7 @@ import { calcPaymentStatus } from '@/context/ClientContext';
 import { mapRow, type ClientRow } from '@/lib/clients';
 import { weekFromStart } from '@/lib/my-client';
 import { ONBOARDING_TOTAL } from '@/lib/onboarding';
+import { QUESTIONNAIRE_FIELDS } from '@/lib/onboarding-questionnaire';
 import { weekStats, type TrackerProfile, type TrackerLog } from '@/lib/tracker';
 import ImportClientsModal from '@/components/coach/ImportClientsModal';
 import type { Client, ClientStatus } from '@/lib/types';
@@ -283,6 +284,75 @@ function AddClientModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
 }
 
 const TRACKER_PURPLE = '#9b59b6';
+
+// Read-only view of ONE client's onboarding intake questionnaire + welcome-pack
+// signature, in their expanded roster row. Lazily fetched on open, like the
+// tracker below, so we don't pull every client's answers upfront.
+function QuestionnaireSummary({ clientId, clientName }: { clientId: string; clientName: string }) {
+  const [loading, setLoading]       = useState(true);
+  const [answers, setAnswers]       = useState<Record<string, string> | null>(null);
+  const [signedName, setSignedName] = useState<string | null>(null);
+  const [signedAt, setSignedAt]     = useState<string | null>(null);
+  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/clients/questionnaire?id=${encodeURIComponent(clientId)}`, { cache: 'no-store' });
+        const d = await res.json();
+        if (!alive) return;
+        setAnswers(d.answers ?? null);
+        setSignedName(d.signedName ?? null);
+        setSignedAt(d.signedAt ?? null);
+        setSubmittedAt(d.submittedAt ?? null);
+      } catch { /* leave empty */ } finally { if (alive) setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, [clientId]);
+
+  const fmt = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+  if (loading) return <p className="text-[12px]" style={{ color: 'var(--text3)' }}>Loading…</p>;
+
+  const hasAnswers = !!answers && Object.keys(answers).length > 0;
+  if (!hasAnswers && !signedName) {
+    return (
+      <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
+        {clientName.split(' ')[0]} hasn&apos;t submitted the questionnaire yet.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      {signedName && (
+        <p className="text-[12px] mb-3" style={{ color: 'var(--text2)' }}>
+          ✍️ Welcome pack signed by <strong style={{ color: 'var(--text)' }}>{signedName}</strong>
+          {signedAt ? ` · ${fmt(signedAt)}` : ''}
+        </p>
+      )}
+      {hasAnswers ? (
+        <>
+          {submittedAt && (
+            <p className="text-[11px] mb-2.5" style={{ color: 'var(--text3)' }}>Submitted {fmt(submittedAt)}</p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
+            {QUESTIONNAIRE_FIELDS.filter((f) => answers![f.id]).map((f) => (
+              <div key={f.id} className="text-[12px] leading-[1.5]">
+                <span style={{ color: 'var(--text3)' }}>{f.label}: </span>
+                <span style={{ color: 'var(--text)' }}>{answers![f.id]}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-[12px]" style={{ color: 'var(--text3)' }}>No questionnaire answers yet.</p>
+      )}
+    </div>
+  );
+}
 
 // Read-only view of ONE client's meal tracker, shown inside their expanded
 // roster row. Lazily fetches /api/tracker/client when the row opens (the
@@ -997,6 +1067,14 @@ export default function ClientRosterPage() {
                       >
                         {onboardingStatus(c).label}
                       </span>
+                    </div>
+
+                    {/* Intake questionnaire + welcome-pack signature — lazy-loaded on open */}
+                    <div className="col-span-2 rounded-[10px] px-4 py-3" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                      <h3 className="text-[13px] font-semibold mb-2" style={{ color: 'var(--text)' }}>
+                        Intake questionnaire
+                      </h3>
+                      <QuestionnaireSummary clientId={c.id} clientName={c.name} />
                     </div>
 
                     {/* Meal tracker — read-only, lazily loaded when this row opens */}

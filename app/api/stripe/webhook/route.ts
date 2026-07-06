@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/server';
 import { generateReferralCode } from '@/lib/referral';
+import { notifyCoach } from '@/lib/coach-notify';
 
-// Stripe webhook — turns a £185/month Payment Link purchase into a pending
-// client on Sam's roster, keeps next_payment_date fresh on each renewal, and
+// Stripe webhook — turns a subscription purchase into a fully-onboarding client
+// on Sam's roster, keeps next_payment_date fresh on each renewal, and
 // auto-cancels the client when Stripe gives up on the subscription.
 //
 // Pipeline:
-//   checkout.session.completed   → create pending client (access_granted_at null)
+//   checkout.session.completed   → create client, AUTO-INVITE (send portal invite
+//                                  + grant access), flag onboarding_required, and
+//                                  email Sam. (Decision 2026-07-06: fully automatic
+//                                  — the in-portal onboarding IS the gate, no manual
+//                                  grant. The client sets a password and works
+//                                  through onboarding before the portal unlocks.)
 //   invoice.paid                 → bump next_payment_date for renewals
 //   customer.subscription.deleted → flip status to 'Cancelled' + reason
 //
@@ -213,17 +219,40 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     return;
   }
 
+  // AUTO-INVITE the new client so they can start onboarding immediately. Send the
+  // Supabase invite email; on success we get their auth user id. Non-fatal on
+  // failure — we still create the roster row so the payment isn't lost, and the
+  // client can use "Forgot password" to get a fresh link.
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+  let invitedUserId: string | null = null;
+  const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
+    email,
+    { data: { full_name: fullName }, redirectTo: `${siteUrl}/auth/callback` },
+  );
+  if (inviteError) {
+    if (inviteError.message.includes('already been registered')) {
+      // They already have an auth login (e.g. a returning client) — link it.
+      const { data: list } = await admin.auth.admin.listUsers();
+      invitedUserId = list?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())?.id ?? null;
+    } else {
+      console.error('[stripe webhook] invite failed (creating client anyway):', inviteError.message);
+    }
+  } else {
+    invitedUserId = inviteData?.user?.id ?? null;
+  }
+
   const { error } = await admin.from('clients').insert({
-    user_id: null, // pending — no auth user yet
+    user_id: invitedUserId,
     coach_id: coachId,
     full_name: fullName,
     email,
     phone,
     goal: null,
-    // Brand-new signup from the website → they SHOULD see the onboarding flow
-    // (welcome videos + setup) once Sam grants access. Existing/imported clients
-    // stay onboarding_required=false; the manual-link path above never sets this,
-    // so a current client who later buys via Stripe isn't retro-forced into it.
+    // Brand-new signup from the website → they go through the full onboarding flow
+    // (videos, questionnaire, welcome pack, booking a call) before the portal
+    // unlocks. Existing/imported clients stay onboarding_required=false; the
+    // manual-link path above never sets this, so a current client who later buys
+    // via Stripe isn't retro-forced into it.
     onboarding_required: true,
     status: 'Active',
     next_payment_date: nextPaymentDate,
@@ -232,11 +261,25 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     notes: null,
     since: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     referral_code: generateReferralCode(fullName),
-    access_granted_at: null, // PENDING — Sam grants access from the roster
+    // Auto-granted on payment — the onboarding flow (not a manual grant) is the gate.
+    access_granted_at: new Date().toISOString(),
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
   });
   if (error) throw new Error(`Failed to insert client: ${error.message}`);
+
+  // Let Sam know someone paid (best-effort — no-ops if RESEND_API_KEY /
+  // COACH_NOTIFY_EMAIL aren't set; never blocks the webhook).
+  await notifyCoach(
+    `New SS Sustain client — ${fullName}`,
+    `<p><strong>${fullName}</strong> just paid and has been added to your roster and invited to the portal.</p>
+     <ul>
+       <li>Email: ${email}</li>
+       ${phone ? `<li>Phone: ${phone}</li>` : ''}
+       ${monthlyAmount != null ? `<li>Amount per payment: £${monthlyAmount} (every ${intervalToStore} month${intervalToStore === 1 ? '' : 's'})</li>` : ''}
+     </ul>
+     <p>They'll set their password and work through onboarding — the welcome videos, the intake questionnaire, signing the welcome pack, and booking their call with you. Their questionnaire answers will show on their roster row once submitted.</p>`,
+  );
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
