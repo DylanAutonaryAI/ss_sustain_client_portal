@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/lib/supabase/client';
-import { ONBOARDING_TEST_MODE } from '@/lib/onboarding';
+import { ONBOARDING_ENABLED, ONBOARDING_TEST_MODE } from '@/lib/onboarding';
 import { MobileNavProvider } from '@/context/MobileNavContext';
 import ClientSidebar from '@/components/layout/ClientSidebar';
 import ChatWidget from '@/components/assistant/ChatWidget';
@@ -38,6 +38,9 @@ export default function PortalShell({ children }: { children: React.ReactNode })
   // session / changing `user` can't cancel it mid-flight, and always resolves
   // gateChecked (fails open) so a transient error can never trap the portal.
   useEffect(() => {
+    // Master switch OFF → onboarding gate fully disabled. No fetch, no redirect;
+    // every client goes straight to the portal. Flip ONBOARDING_ENABLED to re-arm.
+    if (!ONBOARDING_ENABLED) { setGateChecked(true); return; }
     let cancelled = false;
     fetch('/api/onboarding/me', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))

@@ -1,12 +1,22 @@
 import type { OnboardingStep } from '@/lib/types';
 
-// ⚠️ TESTING MODE — set to FALSE at go-live (and delete the admin skip button).
+// ⚠️ MASTER SWITCH — onboarding gate on/off.
+//   false (current): NO client is EVER routed through onboarding. After they set
+//     their password they land straight on the portal home — they never see the
+//     onboarding page, videos, or steps. Used to move Sam's existing clients off
+//     Notion without making them sit through the flow.
+//   true: the onboarding gate is active (its behaviour then depends on
+//     ONBOARDING_TEST_MODE below). Flip back to true when onboarding is wanted for
+//     new (Stripe) clients coming in via the website.
+export const ONBOARDING_ENABLED = false;
+
+// TESTING MODE — only has any effect when ONBOARDING_ENABLED is true.
 // When true, a CLIENT is routed through onboarding on EVERY login regardless of
 // whether they've completed it, and the onboarding page shows an admin "Skip for
-// now" button (a per-session bypass). This runs in PRODUCTION too — not just
-// localhost — so the flow can be tested on the live site. When false: onboarding
-// shows only until the client completes it once, and there's no skip button.
-export const ONBOARDING_TEST_MODE = true;
+// now" button (a per-session bypass). When false: onboarding shows only until the
+// client completes it once, and there's no skip button. Kept false so a future
+// re-enable behaves as the real client gate, not the test loop.
+export const ONBOARDING_TEST_MODE = false;
 
 // ─── Canonical onboarding steps ──────────────────────────────────────────────
 //

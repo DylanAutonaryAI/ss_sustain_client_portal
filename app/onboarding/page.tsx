@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ONBOARDING_STEPS, ONBOARDING_STEP_KEYS, ONBOARDING_TEST_MODE } from '@/lib/onboarding';
+import { ONBOARDING_STEPS, ONBOARDING_STEP_KEYS, ONBOARDING_TEST_MODE, ONBOARDING_ENABLED } from '@/lib/onboarding';
 import SsLogo from '@/components/ui/SsLogo';
 
 // Testing behaviour (start fresh every login + admin skip button) is on whenever
@@ -40,6 +40,12 @@ export default function OnboardingPage() {
   // inline, a placeholder has no link, or a doc/action link has already been opened.
   const isOpened = opened.has(step.id) || !step.url || !!embedUrl || isLocalVideo;
   const allDone = completedAt !== null;
+
+  // Onboarding disabled globally (ONBOARDING_ENABLED=false) → no client is routed
+  // here, but guard a stray bookmark/direct visit by bouncing to the portal home.
+  useEffect(() => {
+    if (!ONBOARDING_ENABLED) router.replace('/portal/home');
+  }, [router]);
 
   // Hydrate progress from the server so a returning / cross-device client picks
   // up exactly where they left off. In DEV we deliberately start fresh every time
@@ -118,6 +124,16 @@ export default function OnboardingPage() {
   };
 
   const isLastStep = currentIdx === total - 1;
+
+  // Onboarding disabled → show nothing but a redirect placeholder (the effect
+  // above navigates away) so the flow never flashes on a stray direct visit.
+  if (!ONBOARDING_ENABLED) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <span className="text-[13px]" style={{ color: 'var(--text3)' }}>Redirecting…</span>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

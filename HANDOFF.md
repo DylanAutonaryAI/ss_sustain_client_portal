@@ -34,8 +34,8 @@ done; the short version:
 **Deferred on purpose — do NOT apply without a decision** (each documented in Recently
 done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach) and the
 **Next major upgrade** (breaking; mitigated by Vercel — **DECISION 2026-07-05: stay on
-Next 14 for now**, go 14→15 first when picked up). **`ONBOARDING_TEST_MODE` is deliberately
-still ON — not going live yet.**
+Next 14 for now**, go 14→15 first when picked up). **Onboarding gate is now DISABLED
+(`ONBOARDING_ENABLED = false`) so invited clients go straight to the portal — see Active.**
 
 **The two minor auth lows are now BUILT + SHIPPED (2026-07-05, commit `2555550`)** —
 invite-token single-use + email ownership-verify. Migration **applied**; Supabase **Secure
@@ -62,8 +62,10 @@ link — Sam's primary client comms channel, now one click away.
 2. **Repeat the sandbox flow in LIVE mode** when Sam's ready. Create a Live-mode event
    destination at the same URL, replace both Vercel env vars with live `sk_live_…` and
    `whsec_…`. **Live keys go straight into Vercel — never paste them in chat.**
-3. **Flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the admin skip
-   button — last-minute, do at go-live.
+3. ~~Flip `ONBOARDING_TEST_MODE` → false + remove skip button~~ **✅ SUPERSEDED (2026-07-05):
+   onboarding gate fully DISABLED via `ONBOARDING_ENABLED = false`; `ONBOARDING_TEST_MODE`
+   also set false. Invited clients go straight to `/portal/home`. Re-enable both when
+   onboarding is wanted for new (Stripe) clients.**
 4. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
 5. **Confirm refresh-token health under the new keys** — the "there" fix populates the
@@ -79,8 +81,31 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — nothing in progress
-Both auth-hardening lows are **shipped + live** (commit `2555550`).
+## 🟢 Active — inviting Sam's existing clients, onboarding gate OFF
+**Decision (2026-07-05): the onboarding gate is DISABLED.** New master switch
+**`ONBOARDING_ENABLED = false`** in `lib/onboarding.ts` — **no client is ever routed through
+onboarding.** After a client sets their password they land straight on `/portal/home`; they
+never see the onboarding page, videos, or steps. Implemented in
+`components/layout/PortalShell.tsx` (gate effect no-ops when disabled) + `app/onboarding/page.tsx`
+(a stray direct visit bounces to `/portal/home`). `ONBOARDING_TEST_MODE` also set **false** so
+a future re-enable is the real client gate, not the every-login test loop. Typecheck + lint clean.
+- **Why:** move Sam's existing ~27 clients off Notion into the portal NOW, without making them
+  sit through an onboarding flow built for brand-new signups.
+- **Re-enabling later:** flip `ONBOARDING_ENABLED` back to `true` when the Stripe/new-client
+  website flow is built (the NEXT piece of work) and onboarding is wanted for new signups.
+- **To invite the wave:** import the client sheet as pending → roster **"Grant access to all N
+  pending"** (`/api/clients/grant-access-all` — sequential, paced ~120ms to dodge email
+  rate-limits). Each client gets the Supabase **"Invite user"** email from the verified
+  sssustain.com sender → set-password page → straight to home. Slow clickers whose invite link
+  expires just use **"Forgot password"** for a fresh link; already-registered emails get no new
+  email (also use Forgot password).
+- ⚠️ **Before the mass send: check/brand the "Invite user" email** in Supabase → Authentication
+  → Emails (it's currently whatever's configured — likely the generic default), and glance at
+  Auth → Rate Limits if inviting more than ~30 at once.
+
+---
+
+## 🟢 Prior — auth-hardening lows (shipped + live, commit `2555550`)
 - **Email ownership-verify — VERIFIED WORKING END-TO-END in prod (2026-07-05).** Real
   client email change → **double-confirm** (Secure email change ON → links to both the old
   and new inbox) → login flipped to the new address, the old one stopped working. Exactly
@@ -90,8 +115,6 @@ Both auth-hardening lows are **shipped + live** (commit `2555550`).
   manually smoke-tested — low-risk, optional to exercise later (re-open a used invite link,
   or curl `/api/set-password` twice with the same tokens → expect HTTP 409 "already been
   used"). Fails safe if ever wrong (set-password still works).
-
-`ONBOARDING_TEST_MODE` is deliberately still **ON** — not going live yet.
 
 ---
 
@@ -627,11 +650,12 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   logout/AuthProvider hardening.
 
 ## ⏭️ Still to do
-- **At go-live: flip `ONBOARDING_TEST_MODE` → false** (`lib/onboarding.ts`) + remove the
-  admin skip button (`app/onboarding/page.tsx`). Last-minute; until then the gate shows every
-  login + a prod skip button (for testing).
-- **Onboarding go-live** — only Gate 2 left: Sam's **welcome video** + **portal walkthrough**
-  Loom URLs (the SQL is applied). Then optionally wire the completion email to Sam.
+- **Invite Sam's existing clients** (see Active): brand the "Invite user" email, import the
+  sheet as pending, "Grant access to all pending". Onboarding gate is OFF so they go straight
+  to home.
+- **Stripe for new clients** — the next build after the invite wave: new customers pay via
+  Sam's website and land in the portal properly. When that's done, decide whether to re-enable
+  onboarding (`ONBOARDING_ENABLED = true`) for new signups.
 - **Confirm refresh-token health under the new API keys.** The "there" fix made the profile
   display reliable, but verify `POST /auth/v1/token?grant_type=refresh_token` returns 2xx
   after a clean re-login. If it 4xx's (`invalid_grant`), the JWT *signing* keys may need
@@ -670,8 +694,12 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `sb_publishable_…` keys. To fix local dev on this machine, pull the new keys into
   `.env.local` (e.g. `vercel env pull`) — the anon + service-role values, plus optionally
   `SUPABASE_DB_URL` so `scripts/run-migration.mjs` works here.
-- **`ONBOARDING_TEST_MODE = true`** (`lib/onboarding.ts`) forces onboarding on every login +
-  shows the admin skip button **in production** (for testing). **Set it `false` at go-live.**
+- **Onboarding gate is OFF** — `ONBOARDING_ENABLED = false` (`lib/onboarding.ts`) makes the
+  gate a no-op: no client is ever routed through onboarding; they land straight on
+  `/portal/home` after setting their password. `ONBOARDING_TEST_MODE` is also `false`. To
+  bring onboarding back for new clients, set `ONBOARDING_ENABLED = true` (and it behaves as the
+  real completed-once gate, since TEST_MODE is false). Gate logic lives in
+  `components/layout/PortalShell.tsx`; the `/onboarding` page self-redirects home when disabled.
 - **Browser auth uses a no-op `lock`** (`lib/supabase/client.ts`) — both `navigator.locks`
   and `processLock` deadlocked `getSession()`. Don't re-introduce a blocking lock.
 - **No edge middleware** — `middleware.ts` was removed (it 500'd the whole site). Don't
