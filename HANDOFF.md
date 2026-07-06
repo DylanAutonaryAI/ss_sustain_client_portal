@@ -2,35 +2,43 @@
 
 > **Purpose:** the single source of truth for *what is being worked on right now*,
 > shared across machines (laptop ↔ computer) through git. Chat history does NOT
-> sync between machines — this file is how context is carried.
->
-> **Rules for Claude:**
-> - **Read this at the START of every session.**
-> - **Update it at the END of every session, before pushing.**
-> - The **Active** section is the live state — **overwrite it to match reality.**
->   When a task is finished, MOVE it from Active into Recently done, and set
->   Active to whatever is now in progress (or "Nothing in progress" if idle).
-> - Do **not** leave a finished task sitting in Active. Stale = bad.
-> - Keep entries tight: what / decision / where it lives in the code / what's left.
+> sync between machines — this file is how context is carried.**Rules for Claude:**
 
 ---
 
-## 📌 Latest handoff note (2026-07-06) — Referral "Mark joined" now creates the client
+## 📌 Latest handoff note (2026-07-06 evening) — Existing clients INVITED; two live fixes
+
+**Sam's existing clients are now being invited into the portal.** Branded invite email is live,
+the wave sent **30/31** (1 capped by the email rate limit), all clients skip onboarding
+(`onboarding_required=false`). Full state + carry-forwards are in **🟢 Active** below. Two issues
+surfaced tonight and are handled:
+- **Invite "link expired"** (lads clicking hours after send) → recovery is **Forgot password**;
+  raise **Email OTP Expiration** for future waves. (Watch out §)
+- **Roster saves silently lost** during long data entry → silent-failure UI **fixed + shipped**
+  (`d4e19ed`); session-kill root cause = refresh-token **revocation false-positive**, **fix applied**
+  in Supabase (Detect-and-revoke OFF + reuse 30s) — **⏳ needs the log-out/in + 15-min save test to
+  confirm before Sam re-enters the lost data.** (Watch out §, red entry.)
+
+**NEXT after that's confirmed:** Stripe + landing-page go-live (webhook already flags new signups
+for onboarding — `38cbc5f`). See Active.
+
+Prior top note (referral "Mark joined" creates a pending client — `8bd06d3`, deployed) preserved
+below.
+
+---
+
+## 📎 Prior note (2026-07-06) — Referral "Mark joined" now creates the client
+
 When Sam clicks **Mark joined** on a referral lead and picks a plan, the referred friend is
 now **created on the roster as a pending client** (unless an existing client already matches
-by email). Previously `convert` only *linked* to a pre-existing client row, so referred
-friends never showed up in the roster — Sam had no way to onboard them. New flow: **Mark
-joined → pending client appears → "Grant access & send invite"** (the same pending-client
-pattern as the Stripe purchase flow). One file changed: `app/api/referral/manage/route.ts`
-(`convert` action). **Re-convert is dupe-safe** (the email match finds the row it created);
-**unconvert deliberately leaves the created client in place** (delete it from the roster if the
-conversion was a genuine mistake — safer than auto-wiping a client who may already have access
-or data). No DB migration, no new env var. Typecheck clean. **Pushed + deployed this pass.**
+by email). One file changed: `app/api/referral/manage/route.ts` (`convert` action). Re-convert
+is dupe-safe; unconvert leaves the created client in place. No migration, no env var. Deployed.
 
 ---
 
 ## 📎 Recent note (2026-07-05) — Security remediation shipped + per-client billing
-Two things landed this pass, both **pushed to `master` (auto-deployed)** and, where DB
+
+Two things landed this pass, both **pushed to master (auto-deployed)** and, where DB
 was involved, **applied + verified against the live database**. Full detail in Recently
 done; the short version:
 
@@ -49,10 +57,10 @@ done; the short version:
 done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach) and the
 **Next major upgrade** (breaking; mitigated by Vercel — **DECISION 2026-07-05: stay on
 Next 14 for now**, go 14→15 first when picked up). **Onboarding is now PER-CLIENT
-(`clients.onboarding_required` + a checkbox in the Add-client modal); existing clients go
+(clients.onboarding\_required + a checkbox in the Add-client modal); existing clients go
 straight to the portal — see Active.**
 
-**The two minor auth lows are now BUILT + SHIPPED (2026-07-05, commit `2555550`)** —
+**The two minor auth lows are now BUILT + SHIPPED (2026-07-05, commit 2555550)** —
 invite-token single-use + email ownership-verify. Migration **applied**; Supabase **Secure
 email change ON** (double-confirm). Both live in prod, **in live smoke-testing**. See
 Recently done + Watch out.
@@ -60,6 +68,7 @@ Recently done + Watch out.
 ---
 
 ## 📎 Prior note (2026-06-04) — Stripe sandbox flow verified + roster About block
+
 **Stripe sandbox → portal verified end-to-end** with a real test purchase (£185, card
 `4242…`) on 2026-06-04 — pending client appeared in the roster within seconds. Roster
 follow-up shipped same day: every row now shows the **email** under the name, a
@@ -71,26 +80,27 @@ has a Stripe sub. **Phone is editable inline in the About block** with a click-t
 link — Sam's primary client comms channel, now one click away.
 
 ⚠️ **Carry-forward before this works in prod (in order):**
-1. ~~Run `db/2026-06-04_client_phone.sql`~~ **✅ DONE (2026-07-05).** `clients.phone`
+
+1. ~~Run db/2026-06-04\_client\_phone.sql~~ **✅ DONE (2026-07-05).** `clients.phone`
    applied via the SQL editor (`add column if not exists`, idempotent). Roster
    phone/WhatsApp field + Stripe `customer_details.phone` are now safe.
 2. **Repeat the sandbox flow in LIVE mode** when Sam's ready. Create a Live-mode event
    destination at the same URL, replace both Vercel env vars with live `sk_live_…` and
    `whsec_…`. **Live keys go straight into Vercel — never paste them in chat.**
-3. ~~Flip `ONBOARDING_TEST_MODE` → false + remove skip button~~ **✅ SUPERSEDED (2026-07-05):
-   onboarding is now PER-CLIENT (`clients.onboarding_required` + Add-client checkbox).
-   `ONBOARDING_TEST_MODE = false`; `ONBOARDING_ENABLED = true` is a global kill-switch.
-   Existing clients (flag false) go straight to `/portal/home`; tick the box for a new client
+3. ~~Flip ONBOARDING\_TEST\_MODE → false + remove skip button~~ **✅ SUPERSEDED (2026-07-05):
+   onboarding is now PER-CLIENT (clients.onboarding\_required + Add-client checkbox).
+   ONBOARDING\_TEST\_MODE = false; ONBOARDING\_ENABLED = true is a global kill-switch.
+   Existing clients (flag false) go straight to /portal/home; tick the box for a new client
    who should see the flow.**
 4. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
 5. **Confirm refresh-token health under the new keys** — the "there" fix populates the
    profile from the server reliably, but if `grant_type=refresh_token` is genuinely broken
    (vs a stranded pre-migration session), browser sessions still can't auto-extend past the
-   access-token lifetime (~1h). A clean sign-out → sign-in + a Network check on
+   access-token lifetime (\~1h). A clean sign-out → sign-in + a Network check on
    `POST /auth/v1/token?grant_type=refresh_token` (should be 2xx) confirms it.
 
-Deploys go to **`master`** (Vercel's production branch was switched from `main` →
+Deploys go to **master** (Vercel's production branch was switched from `main` →
 `master` on 2026-05-30 — see Recently done). A plain `git push origin master` now
 auto-deploys to production. Workflow: `git pull` at start → work in ONE place →
 "update the handoff and push" at end. (Setup in `CLAUDE.md`.)
@@ -98,6 +108,7 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 ---
 
 ## 🟢 Active — existing clients INVITED (branded email live); NEXT = Stripe go-live
+
 **Invite wave went out 2026-07-06.** Branded **"Invite user"** email is live in Supabase
 (dark-brand HTML, green CTA, `applogo.png`) and rendering correctly. "Grant access to all
 pending" sent **30 of 31** invites; the **31st (Reece Giles) hit Supabase's default 30/hr
@@ -107,9 +118,18 @@ home, no onboarding, and it never reappears on re-login. **Carry-forward:** send
 "check spam / mark Not Junk" heads-up (30 real emails may spam-folder), raise the email cap,
 re-grant Reece, and verify inbox-vs-spam in the Resend log.
 
+**🔴 Evening 2026-07-06 — two live issues, both handled (see Watch out for detail):**
+(a) **Invite links expiring** — lads clicking hours later hit "link expired"; recovery is
+**Forgot password** → fresh link. Raise **Email OTP Expiration** (Auth → Sign In / Providers →
+Email) to 86400+ so future links last a day. (b) **Roster saves silently lost** during Sam's long
+data-entry — silent-failure UI **fixed + shipped** (`d4e19ed`); root cause = refresh-token
+**revocation false-positive**, **fix applied** in Supabase (Detect-and-revoke OFF + reuse interval
+30s) but **NOT yet confirmed** — needs the log-out/in + 15-min save test before trusting it. Sam
+should **re-enter the lost payment/info** after that test passes.
+
 **NEXT WORK — Stripe + landing-page go-live.** Decision (2026-07-06): **manual grant** flow
 (payment → pending client → Sam grants after his call → invite + onboarding). Webhook already
-creates pending clients; **added `onboarding_required = true` to the Stripe insert path only**
+creates pending clients; **added onboarding\_required = true to the Stripe insert path only**
 (commit pending) so new website signups see the onboarding flow when granted, while existing/
 imported clients and the "link to existing roster row" path are untouched. Remaining to go
 live: (1) Stripe test→LIVE — live products/prices per plan, a LIVE webhook endpoint at
@@ -122,11 +142,13 @@ collect name+email(+phone), add a "check your email to set up your portal" succe
 ---
 
 ## 🟢 Prior active — onboarding is PER-CLIENT
+
 **Decision (2026-07-05): onboarding is a per-client choice, set at add-time** (commit
-`5a7cfdc`, deployed). New column **`clients.onboarding_required`** (default **false**) + a
+`5a7cfdc`, deployed). New column **clients.onboarding\_required** (default **false**) + a
 **"Show onboarding flow" checkbox** in the Add-client modal. A client sees onboarding **only if
 their flag is true AND they haven't completed it**; everyone else lands straight on
 `/portal/home`.
+
 - **Existing / bulk-imported clients** default `false` → straight to home (the invite wave).
 - **Brand-new client** → tick the box in the Add-client modal → they get the welcome videos +
   setup steps until they finish once, then never again.
@@ -137,31 +159,32 @@ their flag is true AND they haven't completed it**; everyone else lands straight
   kill-switch** (respects per-client flags; set false only to disable the whole flow).
   `ONBOARDING_TEST_MODE = false`. Typecheck + lint clean.
 - **To invite the existing wave:** import the client sheet as pending → roster **"Grant access to all N
-  pending"** (`/api/clients/grant-access-all` — sequential, paced ~120ms to dodge email
+  pending"** (`/api/clients/grant-access-all` — sequential, paced \~120ms to dodge email
   rate-limits). Each client gets the Supabase **"Invite user"** email from the verified
   sssustain.com sender → set-password page → straight to home. Slow clickers whose invite link
   expires just use **"Forgot password"** for a fresh link; already-registered emails get no new
   email (also use Forgot password).
 - ⚠️ **Before the mass send: check/brand the "Invite user" email** in Supabase → Authentication
   → Emails (it's currently whatever's configured — likely the generic default), and glance at
-  Auth → Rate Limits if inviting more than ~30 at once.
+  Auth → Rate Limits if inviting more than \~30 at once.
 - ⚠️ **EMAIL RATE LIMIT (bit us 2026-07-06):** Supabase → Authentication → **Rate Limits →
   "Rate limit for sending emails"** defaults to **30/hour** — a bulk grant of >30 fails partway
   ("email rate limit exceeded"). Failed grants leave the client **pending** (retryable, nothing
   breaks). **Raise to 100/hr before any bulk invite.** Raising the cap unblocks immediately if
-  your recent count is under the new limit. Resend also has its own daily cap (free ~100/day) —
-  check its dashboard for headroom before a big send. The `grant-access-all` ~120ms pacing only
+  your recent count is under the new limit. Resend also has its own daily cap (free \~100/day) —
+  check its dashboard for headroom before a big send. The `grant-access-all` \~120ms pacing only
   dodges per-second limits, not the hourly one.
 
 ---
 
 ## 🟢 Prior — auth-hardening lows (shipped + live, commit `2555550`)
+
 - **Email ownership-verify — VERIFIED WORKING END-TO-END in prod (2026-07-05).** Real
   client email change → **double-confirm** (Secure email change ON → links to both the old
   and new inbox) → login flipped to the new address, the old one stopped working. Exactly
   the intended behaviour.
 - **Invite single-use — shipped, code-verified + adversarially checked; migration applied.**
-  The replay-block (409 on re-submitting a used invite within its ~1h token window) was NOT
+  The replay-block (409 on re-submitting a used invite within its \~1h token window) was NOT
   manually smoke-tested — low-risk, optional to exercise later (re-open a used invite link,
   or curl `/api/set-password` twice with the same tokens → expect HTTP 409 "already been
   used"). Fails safe if ever wrong (set-password still works).
@@ -171,12 +194,14 @@ their flag is true AND they haven't completed it**; everyone else lands straight
 ## 🟢 Recently done — auth-hardening lows (2026-07-05)
 
 ### Invite-token single-use + email ownership-verify — BUILT (typecheck + prod build clean)
+
 The last two deferred security lows, both non-breaking and fail-safe:
+
 - **Invite single-use.** `db/2026-07-05_invite_single_use.sql` adds
   `clients.invite_accepted_at`. `app/api/set-password/route.ts` now looks up the client
   row after validating the invite token: if `invite_accepted_at` is already set it returns
   **409** ("already used — sign in"), otherwise it sets the password and **stamps the
-  column** so the ~1h-valid invite access_token can't be replayed to re-run the flow.
+  column** so the \~1h-valid invite access\_token can't be replayed to re-run the flow.
   **Fails safe:** the lookup is wrapped so a missing column / DB blip just no-ops the
   enforcement (uses `.limit(1)`, not maybeSingle, so a stray duplicate row can't throw) —
   set-password keeps working, the feature simply activates once the migration is applied.
@@ -200,16 +225,18 @@ The last two deferred security lows, both non-breaking and fail-safe:
 ## 🟢 Recently done — 2026-07-04→05 pass
 
 ### Security audit + remediation (SHIPPED, verified non-breaking) — `fca29cc`, `f5c6603`
+
 A read-only multi-agent audit (5 independent areas + adversarial verify + a completeness
 loop) graded the codebase: **1 critical, 0 high, 4 medium, 21 low**. Then a fix pass that
 was explicitly constrained to *not change how any legit flow works*, re-checked by a
 3-lens adversarial workflow (**result: zero broken flows, zero ineffective fixes**; 3
 nits found and fixed).
+
 - **CRITICAL — client→coach self-promotion — FIXED + verified on the live DB.** The
   `profiles` UPDATE policy had a null WITH CHECK and `authenticated`/`anon` held an UPDATE
   grant on the `role` column, so any signed-in user could promote themselves to coach.
-  `db/2026-07-04_fix_profiles_role_escalation.sql` **revokes UPDATE on `profiles` from
-  `authenticated`/`anon`** — grant is now only `postgres`/`service_role`. Verified by
+  `db/2026-07-04_fix_profiles_role_escalation.sql` **revokes UPDATE on profiles from
+  authenticated/anon** — grant is now only `postgres`/`service_role`. Verified by
   direct query: 1 coach row (Sam), 0 unexpected roles. The browser never writes `profiles`
   (confirmed: zero direct browser table writes), so nothing legit breaks.
 - **All 4 mediums fixed:** community RSVP privacy (clients now see peers as first-name +
@@ -217,16 +244,16 @@ nits found and fixed).
   `app/api/community/route.ts`); assistant **denial-of-wallet** (per-user 60/day cap,
   fail-open — `app/api/assistant/route.ts`); referral **spam + code-enumeration** (per-IP
   rate limit, unique `(referrer, lower(email))` index, self-referral drop, and an
-  **identical `{ok:true}` response** for valid/invalid/self so it can't be used to test
+  **identical {ok:true} response** for valid/invalid/self so it can't be used to test
   codes — `app/api/referral/submit/route.ts`).
 - **Most lows / hardening:** security headers (X-Frame-Options DENY, CSP
   `frame-ancestors 'none'`, nosniff, referrer, permissions — **scoped so Loom embeds +
   next-image are untouched**, `next.config.mjs`); `signout` POST-only (CSRF); `PATCH
   /api/clients` now coach-gated + a **column allow-list** (blocks mass-assignment of
   `role`/`access_granted_at`/etc.); password change requires **current-password re-auth**
-  + min 8 + throttle; email change genericised + throttled; avatar **magic-byte sniff** +
-  fixed overwrite path; RPC execute grants + the `clients` ALL policy locked to
-  authenticated coaches (`db/2026-07-04_fix_clients_policy.sql`).
+  - min 8 + throttle; email change genericised + throttled; avatar **magic-byte sniff** +
+    fixed overwrite path; RPC execute grants + the `clients` ALL policy locked to
+    authenticated coaches (`db/2026-07-04_fix_clients_policy.sql`).
 - **New infra:** `lib/rate-limit.ts` — DB-backed fixed-window limiter, **fail-open**
   (`db/2026-07-04_rate_limits.sql`); `db/2026-07-04_security_hardening.sql` (RPC grants +
   referral dedup index). All four 2026-07-04 security migrations **applied + verified**.
@@ -236,7 +263,7 @@ nits found and fixed).
     it rewrites load-bearing read policies, so **apply + test on a preview BEFORE adding a
     2nd coach.**
   - **Next.js CVEs** — only fixable by a **Next major upgrade (breaking)**; mitigated by
-    Vercel's platform. **DECISION (2026-07-05): stay on Next 14 (`14.2.35`, latest 14.2.x)
+    Vercel's platform. **DECISION (2026-07-05): stay on Next 14 (14.2.35, latest 14.2.x)
     for now.** Rationale: CVEs are already mitigated at the Vercel layer, 14.2.35 carries
     every backported 14-line fix, and a breaking framework jump has no business landing in
     the go-live window (Stripe → live + real clients off Notion) given how fragile auth is
@@ -248,7 +275,8 @@ nits found and fixed).
     **BOTH BUILT 2026-07-05 — see the dedicated entry below.**
 
 ### Per-client billing frequency + robust import — `ba1056a`, `ef70aec`, `cdd3497`, `52d50a6`
-- **`monthly_amount` redefined as *amount per payment* (installment).** MRR is now
+
+- **monthly\_amount redefined as amount per payment (installment).** MRR is now
   `monthly_amount / billing_interval_months` (`lib/payments.ts`). New
   `clients.billing_interval_months` ∈ {1,3,6,12}
   (`db/2026-07-04_client_billing_interval.sql` + `_client_monthly_amount.sql`, applied).
@@ -260,44 +288,48 @@ nits found and fixed).
 - **Roster importer** (`components/coach/ImportClientsModal.tsx`): header-aware column
   mapping (any order) + value-based multi-row inference. **Import creates pending clients
   and sends NO emails** — for Sam's 27-client sheet.
-- **`scripts/run-migration.mjs`** — pg-based migration runner (reads `SUPABASE_DB_URL`,
+- **scripts/run-migration.mjs** — pg-based migration runner (reads `SUPABASE_DB_URL`,
   transaction-wrapped, refuses drop/truncate/delete without `--force`) so migrations can
   be applied directly.
 
 ### Onboarding videos — BOTH embedded (2026-07-03)
+
 **Onboarding steps 1 (welcome) and 2 (portal walkthrough) are BOTH DONE.** Sam sent
 each as an **mp4** (not a Loom). Both masters are HEVC (browsers can't play HEVC) and
 were re-encoded to committed, web-ready H.264 copies; the masters are **gitignored**:
+
 - Step 1 `welcome` → `/images/welcome-video.mp4` (23.6MB). Master
   `public/images/sssustain welcome video.mp4` gitignored.
-- Step 2 `portal-tour` → `/images/portal-walkthrough-video.mp4` (12.8MB, ~4:49,
+- Step 2 `portal-tour` → `/images/portal-walkthrough-video.mp4` (12.8MB, \~4:49,
   duration label "5 min"). Master `public/images/sam portal walkthrough.mp4` gitignored.
   Note: source was 2010×1080 (odd width) — the re-encode forces even dims via
   `scale=trunc(iw/2)*2:trunc(ih/2)*2` so H.264 `yuv420p` is happy.
-Both play through the `isLocalVideo` path in `app/onboarding/page.tsx` (any step `url`
-starting `/` and ending `.mp4` → native `<video controls>`; the Loom-iframe path is
-untouched). Verified on a production build + `next start`: onboarding 200, walkthrough
-serves `video/mp4` (12.8MB) with `Accept-Ranges: bytes`, range request → 206.
-**All onboarding content blockers are now cleared.** Remaining before go-live is
-operational only: flip `ONBOARDING_TEST_MODE` → false in `lib/onboarding.ts` + remove
-the admin skip button; optionally wire the completion email to Sam.
-Recipe for any future Sam mp4: ffmpeg H.264 CRF 22–23 / 25fps / AAC 128k / `+faststart`
-(+ even-dims scale filter if the source is odd), commit the small copy, gitignore the master.
+  Both play through the `isLocalVideo` path in `app/onboarding/page.tsx` (any step `url`
+  starting `/` and ending `.mp4` → native `<video controls>`; the Loom-iframe path is
+  untouched). Verified on a production build + `next start`: onboarding 200, walkthrough
+  serves `video/mp4` (12.8MB) with `Accept-Ranges: bytes`, range request → 206.
+  **All onboarding content blockers are now cleared.** Remaining before go-live is
+  operational only: flip `ONBOARDING_TEST_MODE` → false in `lib/onboarding.ts` + remove
+  the admin skip button; optionally wire the completion email to Sam.
+  Recipe for any future Sam mp4: ffmpeg H.264 CRF 22–23 / 25fps / AAC 128k / `+faststart`
+  (+ even-dims scale filter if the source is odd), commit the small copy, gitignore the master.
 
 ---
 
 ## 🟢 Earlier active — nothing else in progress
+
 **Stripe sandbox flow is DONE, verified, and shipped.** Sandbox event destination is
 live in Sam's account, both Vercel env vars set, `db/2026-05-30_stripe_integration.sql`
 applied and verified by a real test purchase (£185, card `4242…`). Pending client
 appeared in the roster correctly. Roster "About" + Stripe details follow-up also
 shipped. **Open item before this works in prod for real clients: run
-`db/2026-06-04_client_phone.sql`, then repeat the same Stripe setup in LIVE mode** (new
+db/2026-06-04\_client\_phone.sql, then repeat the same Stripe setup in LIVE mode** (new
 event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 
 ---
 
 ### Earlier this session — Stripe webhook details (kept for cross-machine reference)
+
 - **Built this session:**
   - `app/api/stripe/webhook/route.ts` — Node runtime, signature-verified via
     `stripe.webhooks.constructEvent`. Handles `checkout.session.completed` (creates
@@ -305,7 +337,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
     `subscription_create` first invoice), `customer.subscription.deleted` (auto-marks
     `Cancelled` + reason "Stopped paying"). Returns graceful 503 until env vars are set.
   - `db/2026-05-30_stripe_integration.sql` — `clients.stripe_customer_id` +
-    `stripe_subscription_id`, with a **unique index on `stripe_subscription_id`** that
+    `stripe_subscription_id`, with a **unique index on stripe\_subscription\_id** that
     is the idempotency key (Stripe retries can't double-create a client).
   - `stripe@^17.7.0` added to `package.json`.
 - **Sam-side setup done (in this Stripe Sandbox):** event destination
@@ -327,7 +359,9 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 ---
 
 ### Also live, awaiting Sam — Onboarding flow (Gate 2 only)
+
 **Onboarding flow → made real. Engine built; going-live is gated on 2 things.**
+
 - Was a front-end shell (localStorage only, no coach visibility, skippable,
   duplicate-id bug). Now Supabase-backed:
   - `db/2026-05-27_onboarding_progress.sql` — new `onboarding_progress` table +
@@ -345,7 +379,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   - `app/portal/layout.tsx` — gate now reads the DB, not the browser.
   - `app/coach/clients/page.tsx` — roster shows onboarding status (Not started /
     N of M / Onboarded ✓ + date). Sam's in-portal proof.
-- **GATE 1 — `db/2026-05-27_onboarding_progress.sql` applied ✅** (verified by query;
+- **GATE 1 — db/2026-05-27\_onboarding\_progress.sql applied ✅** (verified by query;
   table + `onboarding_completed_at` column live). Onboarding gate is enforced in prod.
 - **DECISION (2026-05-27): portal onboarding COMPLEMENTS Sam's Brevo flow, doesn't
   replace it.** Sam's real onboarding runs outside the portal — Jotform application →
@@ -359,9 +393,9 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   4. Track your nutrition in MyFitnessPal *(real Loom ✅ — Dylan confirmed keep)*
   5. Sign your welcome pack *(confirmation "clicker" — signing stays in Brevo; ✅ done)*
   6. Join the SS Sustain community *(real WhatsApp link ✅ — group "SS Sustained Coaching")*
-  Cut: first-week (Sam: covered by his Loom video), SS-Sustain-method, intake form,
-  Sheets invite (Sam handles manually). **Notion step dropped — the portal REPLACES
-  Notion.** Welcome-pack signing stays in **Brevo**; portal carries only a confirm clicker.
+     Cut: first-week (Sam: covered by his Loom video), SS-Sustain-method, intake form,
+     Sheets invite (Sam handles manually). **Notion step dropped — the portal REPLACES
+     Notion.** Welcome-pack signing stays in **Brevo**; portal carries only a confirm clicker.
 - **GATE 2 — pending from Sam:** the **welcome video** + **portal walkthrough** video
   Loom URLs. Those are the only content blockers left; the rest of the gate is live.
 - **Deferred:** email to Sam on completion (decided in-portal-only for now — roster badge
@@ -372,19 +406,20 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   clients see their rewards + a team leaderboard.
 
 ## ✅ Recently done
+
 - **2026-05-30 — Settings password change fixed + the REAL cause: Vercel deploy mismatch.**
   - Symptom: the client Settings → Password "Change password" button hung on "Saving…"
     forever. First fix: the browser `supabase.auth.updateUser({ password })` call hangs
     after the API-key migration (same root cause as `getUser`/`getSession`), so it now
-    posts to a **new `app/api/profile/password/route.ts`** that sets the password via the
+    posts to a **new app/api/profile/password/route.ts** that sets the password via the
     admin client (mirrors `/api/profile/email`). Client `savePassword` wrapped in
     try/finally + a 15s `AbortController` so the button can never get permanently stuck.
   - **But the fix kept "not working" — because it never reached production.** Pinned it
     down: every push to `master` was only making a **Preview** deployment (Vercel's
     production branch was `main`), so `app.sssustain.com` was frozen on the last manually
     promoted build. Diagnosis trick that nailed it: a brand-new route returns **404 on the
-    domain** but **401 on the per-commit `*.vercel.app` preview URL** → frozen deploy, not
-    a code bug. **Fix: switched the production branch to `master`** (see Watch out). This
+    domain** but **401 on the per-commit \*.vercel.app preview URL** → frozen deploy, not
+    a code bug. **Fix: switched the production branch to master** (see Watch out). This
     HANDOFF push is the first auto-deploy under the new setting.
 - **2026-05-30 — Pending-access flow built, APPLIED & TESTED ✅ (foundation for Stripe → portal).**
   Migration `db/2026-05-30_client_access.sql` run in Supabase 2026-05-30; adding clients from
@@ -427,7 +462,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
     `_notifyAllSubscribers('SIGNED_IN')` before returning (GoTrueClient.js:850), and that
     awaits EVERY `onAuthStateChange` callback (:3954-62). Our subscriber awaited
     `loadProfile()` → browser `get_my_role` rpc → the call class that hangs post-migration →
-    **sign-in succeeded on the network but `signInWithPassword` never returned**. The login
+    **sign-in succeeded on the network but signInWithPassword never returned**. The login
     page's own browser `get_my_role` await was a second wedge point.
   - **Fix:** subscriber is now fire-and-forget (never awaits); `loadProfile` DELETED —
     AuthContext does zero browser DB queries; login's role check now hits `/api/me` (reads
@@ -457,7 +492,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   - **The Settings clue:** `/api/profile` works because it validates via `getUser()` but
     reads the profile with the **service-role (admin)** client. So the cookie session is
     fine — only the browser-session read path was failing.
-  - **Fix (commits `c848771` → `5420ea4`):** new **`app/api/me/route.ts`** returns the
+  - **Fix (commits c848771 → 5420ea4):** new **app/api/me/route.ts** returns the
     cookie-validated identity, reading the profile via the **admin client** (like
     `/api/profile`). `context/AuthContext.tsx` now populates `user` from `/api/me` **first**
     and NEVER blocks on the hangable browser `getUser()` (it only fills `supabaseUser`
@@ -483,23 +518,23 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   now works end-to-end (Resend domain verified, sender on `sssustain.com`).
 - **2026-05-29 — Meal tracker fills the screen** (commits `015de4e`, `502f9aa`).
   `app/portal/tracker/page.tsx` was locked to a 620px column; every tab now uses the full
-  ~1040px width in a two-column layout (This Week / Settings / Log Meal / Night Out), still
+  \~1040px width in a two-column layout (This Week / Settings / Log Meal / Night Out), still
   stacking to one column on small screens. Tab bar stays centered; Recovery screen stays
   narrow (prose).
 - **2026-05-29 — Chat widget polish** (commit `59a6b37`, parallel session): animate
   open/close + reset the conversation on close.
-- **2026-05-29 — `service_role` key rotated; leak CLOSED.** Migrated off legacy JWT keys to
+- **2026-05-29 — service\_role key rotated; leak CLOSED.** Migrated off legacy JWT keys to
   the new Supabase API keys (`sb_publishable_…` anon, `sb_secret_…` service role) in Vercel +
   local `.env.local`; legacy keys disabled and the old leaked key verified dead (`401`).
   (See Watch out for the env-var specifics.)
 - **2026-05-29 — Operational, done by Dylan:** ran `db/2026-05-28_tracker.sql` and
   `db/2026-05-27_client_status_reason.sql` in Supabase; verified the **Resend domain**
-  (`sssustain.com`) so invites reach real clients; set **`ANTHROPIC_API_KEY`** in Vercel
+  (`sssustain.com`) so invites reach real clients; set **ANTHROPIC\_API\_KEY** in Vercel
   (redeploy + test the assistant from a client login to confirm it answers).
 - **2026-05-28 — Social / meal tracker BUILT & shipped (per-client, coach-visible).**
   Sam's standalone HTML tracker rebuilt natively in the portal so it's per-client and Sam
   can see engagement. Commits `6ff3487` (build) + `ea19a80` (reset + overview link).
-  - **DB: `db/2026-05-28_tracker.sql`** — `tracker_profiles` (per-client setup: daily
+  - **DB: db/2026-05-28\_tracker.sql** — `tracker_profiles` (per-client setup: daily
     calorie target / goal / steps / sessions) + `tracker_logs` (each off-plan meal or night
     out; weekly totals summed from `logged_on`). RLS locked; service-role routes only.
     **⚠️ NOT YET RUN IN SUPABASE — see Watch out.**
@@ -512,7 +547,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   - `app/portal/tracker/page.tsx` — full client UI, portal-themed: This-Week dashboard,
     Log Meal (quick picks + fast-food picker + manual), Night-Out mode (drink counter +
     units + late food), Recovery plan. Nav entry in `ClientSidebar` ("Meal Tracker", `utensils` icon).
-  - `app/coach/clients/page.tsx` — expanded roster row shows a read-only **`TrackerSummary`**
+  - `app/coach/clients/page.tsx` — expanded roster row shows a read-only **TrackerSummary**
     (lazy-loaded): setup chips, this-week off-plan total vs budget + status, recent logs
     (night-out tagged), and a **"Reset tracker"** button. NOTE: headline numbers are *this
     week*; the recent-logs list keeps the last 10 across weeks (so history isn't lost).
@@ -535,7 +570,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   - **AI assistant** — `@anthropic-ai/sdk`; `app/api/assistant/route.ts` (Node runtime,
     client-gated, graceful 503 when `ANTHROPIC_API_KEY` is unset); `lib/assistant/knowledge.ts`
     (static guide + dynamic per-client context); `components/assistant/ChatWidget.tsx`.
-    **⚠️ Needs `ANTHROPIC_API_KEY` in Vercel — see Watch out.**
+    **⚠️ Needs ANTHROPIC\_API\_KEY in Vercel — see Watch out.**
   - **Sound effects** — `lib/sound.ts` + `components/layout/SoundToggle.tsx`: a soft
     nav/action click on the client portal (capture-phase listener in `Sidebar`), toggle in
     the sidebar footer, on/off persisted. Client only (coach side stays silent).
@@ -547,35 +582,35 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `embed` so each webinar plays in place (Loom's own thumbnail) instead of opening a new
   tab. Training Clips still uses the clicker (same component, `embed` left off there).
   Shipped as part of commit `6ff3487`.
-- **2026-05-27 (late) — DEPLOYMENT RESOLUTION: got `app.sssustain.com` live + login/onboarding working.**
+- **2026-05-27 (late) — DEPLOYMENT RESOLUTION: got app.sssustain.com live + login/onboarding working.**
   Long chain of Vercel issues, each fixed:
   1. **Vercel env vars were missing/wrong** → builds failed, then ran but broke at runtime.
      Now set: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
      `NEXT_PUBLIC_SITE_URL=https://app.sssustain.com`.
-  2. **`NEXT_PUBLIC_*` were marked "Sensitive"** → not shipped to the browser → anon key absent →
-     all logins failed. **Fix: the two `NEXT_PUBLIC_*` must be NON-sensitive.** (`SERVICE_ROLE_KEY`
+  2. **NEXT\_PUBLIC\_\* were marked "Sensitive"** → not shipped to the browser → anon key absent →
+     all logins failed. **Fix: the two NEXT\_PUBLIC\_\* must be NON-sensitive.** (`SERVICE_ROLE_KEY`
      stays sensitive — server only.)
   3. **Framework Preset was "Other"** → Vercel served the build as static files, every page 404'd.
      **Fix: Framework Preset = Next.js.** (This was the big one.)
-  4. **Edge middleware kept 500-ing** (`MIDDLEWARE_INVOCATION_FAILED`) → **removed `middleware.ts`**.
-  5. **`SUPABASE_SERVICE_ROLE_KEY` had the wrong value** (anon key) and later was pasted into the
+  4. **Edge middleware kept 500-ing** (`MIDDLEWARE_INVOCATION_FAILED`) → **removed middleware.ts**.
+  5. **SUPABASE\_SERVICE\_ROLE\_KEY had the wrong value** (anon key) and later was pasted into the
      **Note** field instead of **Value** → admin client ran without privileges (RLS blocked it) →
      `/api/onboarding/me` returned `isClient:false`, `/api/clients/me` 500'd. **Fix: real
-     service_role key (role `service_role`) in the Value field.**
+     service\_role key (role service\_role) in the Value field.**
   6. **Supabase auth lock deadlocked the browser** — `getSession()`/`get_my_role` hung, profile
      never loaded ("Hello there"). `navigator.locks` and `processLock` both hung. **Fix: no-op
-     `lock` in `lib/supabase/client.ts`** (single shared browser client).
+     lock in lib/supabase/client.ts** (single shared browser client).
   7. Coach login flashed-then-reset and onboarding/logout were flaky → fixed the **coach & portal
      layouts** (don't redirect on a still-loading `user`), **hardened logout** (timeout so it can't
      hang), and **AuthContext** (only wipe `user` on explicit `SIGNED_OUT`).
   - **Onboarding test-mode is LIVE** (`ONBOARDING_TEST_MODE` in `lib/onboarding.ts`): client sees
     onboarding **every** login + an **admin skip button**; login clears the skip flag. **Set the
-    flag to `false` at go-live** and remove the skip button.
-  - **Deploys now target the `main` branch** (Vercel's production branch). We push `master:main`
+    flag to false at go-live** and remove the skip button.
+  - **Deploys now target the main branch** (Vercel's production branch). We push `master:main`
     each time. Cleaner long-term: point Vercel's production branch back at `master` + delete `main`.
 - **2026-05-27 (late) — Production 500 fire: edge middleware removed.**
   - Commits `01646f6` (harden middleware to fail-open) → `e95c1c0` (drop Supabase SDK
-    from the edge) → `bf9ebf0` (**delete `middleware.ts` entirely**). Even a trivial
+    from the edge) → `bf9ebf0` (**delete middleware.ts entirely**). Even a trivial
     SDK-free middleware kept throwing `MIDDLEWARE_INVOCATION_FAILED` and 500-ing every
     route on this Vercel project. Removing it got the site serving.
   - Auth still enforced: every API route validates the session (401), and login redirects
@@ -625,7 +660,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   - Bundled in from the parallel (onboarding) session: **notification badges**
     (`lib/notifications.ts` + sidebar unseen-counts, coach & client), **UI animation polish**
     (`CountUp`, `Donut`, route `template.tsx` transitions, animated analytics bars), and a
-    new **`db/2026-05-27_client_status_reason.sql`** (pause-reason on clients) — **see Watch out**.
+    new **db/2026-05-27\_client\_status\_reason.sql** (pause-reason on clients) — **see Watch out**.
 - **2026-05-27 — Referral scheme built (tracking + £100 payout reminders).**
   - **Decisions (Dylan):** Sam manually marks a lead "joined" + picks the plan;
     referrer sees their earned/pending £100; new client gets nothing (v1).
@@ -670,12 +705,12 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   - Greened the build: removed two pre-existing unused-symbol lint errors
     (`app/coach/content/page.tsx` `ShoppingItem`, `app/onboarding/page.tsx` `canEnter`).
     No `eslint.ignoreDuringBuilds`, so these were breaking the Vercel build on push.
-- **2026-05-27 (computer) — Client top-bar `<phase> · Week N` is now real & per-client.**
+- **2026-05-27 (computer) — Client top-bar \<phase> · Week N is now real & per-client.**
   - Decision taken: Sam sets a **program start date** per client and the week
     **auto-ticks** from it (Week 1 = first week, +1 every 7 days); **phase = the
-    existing `goal`** field, now editable in the roster.
+    existing goal** field, now editable in the roster.
   - DB: added `program_start date` to `clients` — `db/2026-05-27_client_program_start.sql`
-    (RUN in Supabase ✅, with the created_at backfill).
+    (RUN in Supabase ✅, with the created\_at backfill).
   - New `GET /api/clients/me` lets a logged-in client read their own row (admin-scoped
     to `user_id`) — this was the blocker.
   - New `lib/my-client.ts` (`weekFromStart` / `phaseWeekLabel` / cached `useMyPhaseWeek`)
@@ -700,6 +735,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   logout/AuthProvider hardening.
 
 ## ⏭️ Still to do
+
 - **Invite Sam's existing clients** (see Active): brand the "Invite user" email, import the
   sheet as pending, "Grant access to all pending". Onboarding gate is OFF so they go straight
   to home.
@@ -710,7 +746,7 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   display reliable, but verify `POST /auth/v1/token?grant_type=refresh_token` returns 2xx
   after a clean re-login. If it 4xx's (`invalid_grant`), the JWT *signing* keys may need
   attention in the Supabase dashboard — otherwise browser sessions can't auto-extend past the
-  ~1h access-token lifetime and clients get silently logged out.
+  \~1h access-token lifetime and clients get silently logged out.
 - **AI assistant** — `ANTHROPIC_API_KEY` is set; redeploy (if not already) and test from a
   client login. Future: feed it more SS Sustain knowledge in `lib/assistant/knowledge.ts`.
 - **Meal tracker follow-ups** Sam may want: email/WhatsApp nudges on streaks or no-logs; a
@@ -719,25 +755,26 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   the top-bar currently uses the `goal` field as the phase.
 
 ## ⚠️ Watch out
-- **✅ `service_role` key rotated (2026-05-29) — leak CLOSED.** The key was visible in
+
+- **✅ service\_role key rotated (2026-05-29) — leak CLOSED.** The key was visible in
   screenshots during Vercel debugging. Fixed by migrating off the legacy JWT keys to the
   new Supabase API keys: `SUPABASE_SERVICE_ROLE_KEY` is now an `sb_secret_…` key and
   `NEXT_PUBLIC_SUPABASE_ANON_KEY` an `sb_publishable_…` key (both updated in Vercel + local
   `.env.local`), and the **legacy JWT keys are now disabled**. Verified the old leaked key
   is dead — REST + auth both return `401`. **Do NOT re-enable legacy keys.**
-- **Deploys go to `master` (FIXED 2026-05-30).** Vercel's production branch (Settings →
-  Environments → Production → Branch Tracking) is now **`master`**, so a plain `git push
+- **Deploys go to master (FIXED 2026-05-30).** Vercel's production branch (Settings →
+  Environments → Production → Branch Tracking) is now **master**, so a plain `git push
   origin master` auto-deploys to production. Previously it was `main`, so pushes to master
   only made **Preview** builds and the live site silently froze until someone manually
   promoted — that wasted a whole session (the password-change "stuck on Saving" hunt was
   really just the fix never reaching prod). The stale `main` branch can be deleted; nothing
-  tracks it now. **Don't point the production branch back at `main`.**
+  tracks it now. **Don't point the production branch back at main.**
 - **Vercel env vars (production):** the two `NEXT_PUBLIC_*` keys must be **NON-sensitive**
   (or they won't reach the browser → logins break). Keys are now the **new Supabase API
   keys** (legacy JWT keys disabled): `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_…`,
   `SUPABASE_SERVICE_ROLE_KEY` = `sb_secret_…` (Sensitive, server-only) in the **Value**
   field. **Framework Preset must stay "Next.js"** (if it flips to "Other", every page 404s).
-- **⚠️ This machine's local `.env.local` still holds the OLD legacy Supabase keys** (found
+- **⚠️ This machine's local .env.local still holds the OLD legacy Supabase keys** (found
   2026-07-05: a REST probe returned *"Legacy API keys are disabled"*, disabled 2026-05-28).
   So `npm run dev` HERE can't do admin/DB calls against Supabase, and scripts that read the
   local service-role key will 401. Prod (Vercel) is fine — it has the new `sb_secret_…` /
@@ -748,11 +785,10 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   via the "Show onboarding flow" checkbox in the Add-client modal. A client sees onboarding only
   if their flag is true AND they haven't completed it; everyone else goes straight to
   `/portal/home`. `ONBOARDING_ENABLED = true` (`lib/onboarding.ts`) is a **global kill-switch** —
-  set it false to disable onboarding for EVERYONE regardless of their flag. `ONBOARDING_TEST_MODE
-  = false` (when true + a required client, onboarding re-runs every login w/ an admin skip button
+  set it false to disable onboarding for EVERYONE regardless of their flag. `ONBOARDING_TEST_MODE = false` (when true + a required client, onboarding re-runs every login w/ an admin skip button
   — dev/testing only). Gate logic: `components/layout/PortalShell.tsx`; `/onboarding` self-
   redirects home for anyone who doesn't require it.
-- **Browser auth uses a no-op `lock`** (`lib/supabase/client.ts`) — both `navigator.locks`
+- **Browser auth uses a no-op lock** (`lib/supabase/client.ts`) — both `navigator.locks`
   and `processLock` deadlocked `getSession()`. Don't re-introduce a blocking lock.
 - **No edge middleware** — `middleware.ts` was removed (it 500'd the whole site). Don't
   re-add an edge middleware without solving `MIDDLEWARE_INVOCATION_FAILED` first, or the
@@ -765,11 +801,11 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
      200 `{user}` = session; 200 `{user:null}` = POSITIVELY no session; **503 = transient,
      treat as unknown — never as signed-out** (`fetchMe()` returns `undefined` for it, and
      only a definitive `null` clears the in-memory user).
-  2. **`onAuthStateChange` callbacks must NEVER await anything.** auth-js AWAITS every
+  2. **onAuthStateChange callbacks must NEVER await anything.** auth-js AWAITS every
      subscriber inside `signInWithPassword` (GoTrueClient `_notifyAllSubscribers`) before it
      returns — an awaited slow/hung call there is what wedged the login button on
      "Signing in…". Fire-and-forget only.
-  3. **Every browser-client auth call behind a button is raced with `withTimeout`**
+  3. **Every browser-client auth call behind a button is raced with withTimeout**
      (`lib/with-timeout.ts`): login 15s, /api/me 8s (json read INSIDE the race), reset 10s,
      mismatch signOut 2.5s. (Settings password-change avoids the browser client entirely —
      server route `/api/profile/password` + 15s AbortController.) The browser token machinery
@@ -784,38 +820,58 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `stripe_integration` (run 2026-06-04), and the **2026-07-04 batch** —
   `client_monthly_amount`, `client_billing_interval`, `fix_profiles_role_escalation`,
   `security_hardening`, `rate_limits`, `fix_clients_policy` (all applied + verified by
-  direct query). **✅ `client_phone` (2026-06-04) — APPLIED (confirmed 2026-07-05)**, re-run
+  direct query). **✅ client\_phone (2026-06-04) — APPLIED (confirmed 2026-07-05)**, re-run
   idempotently via the SQL editor; roster phone/WhatsApp + Stripe `customer_details.phone`
   are covered.
-  **✅ `db/2026-07-05_invite_single_use.sql` — APPLIED in Supabase (2026-07-05)** via the SQL
+  **✅ db/2026-07-05\_invite\_single\_use.sql — APPLIED in Supabase (2026-07-05)** via the SQL
   editor (added `clients.invite_accepted_at`). Invite single-use enforcement is now live.
-  **✅ `db/2026-07-05_client_onboarding_required.sql` — APPLIED (2026-07-05)** via the SQL editor
+  **✅ db/2026-07-05\_client\_onboarding\_required.sql — APPLIED (2026-07-05)** via the SQL editor
   (added `clients.onboarding_required` default false). Per-client onboarding checkbox is live.
-  **⛔ `db/DEFERRED_multi_coach_rls.sql` is intentionally NOT applied** — do not run it
+  **⛔ db/DEFERRED\_multi\_coach\_rls.sql is intentionally NOT applied** — do not run it
   until a 2nd coach is being added, and test on a preview first (see the security entry in
   Recently done). If Vercel ever points at a *different* Supabase than local `.env.local`,
   re-run them there.
-- **AI assistant: `ANTHROPIC_API_KEY` is set** (Vercel → Production, Sensitive; server-only).
+- **AI assistant: ANTHROPIC\_API\_KEY is set** (Vercel → Production, Sensitive; server-only).
   If the chat ever says "not set up yet" (503), the key is missing or the deploy predates it
   — redeploy. `app/api/assistant` is client-gated and runs in the Node runtime.
-- **Invite emails work** — the Resend **domain `sssustain.com` is verified** and the Supabase
+- **Invite emails work** — the Resend **domain sssustain.com is verified** and the Supabase
   SMTP sender is on that domain, so invites reach real clients (not just the Resend account
   owner). Invite tokens are single-use; re-add a client to get a fresh link.
-- **🔴 Refresh-token health — now CONFIRMED causing real problems (2026-07-06).** A long coach
-  editing session on the roster **silently lost saves** partway through: Sam updated payments/info
-  for ~everyone and "barely any saved." Root cause = his access token expired mid-session and
-  didn't auto-renew → every `PATCH /api/clients` after ~1h returned 401 → and the "Save changes"
-  button had **no error branch**, so failures were invisible (data loss with no indication). This
-  is real-world evidence the `grant_type=refresh_token` grant is broken under the new keys.
-  **Two fixes:** (1) SHIPPED `d4e19ed` — `saveNote` now surfaces the error, special-cases 401 as
-  "session expired — refresh + re-sign-in", shows Saving…/disabled. (2) DURABLE fix (Supabase, do
-  it): **raise Access token (JWT) expiry** (Authentication → Sessions) 3600 → **604800 (1 week)**
-  so the token can't lapse mid-session — this also fixes "stay logged in". The proper root fix is
-  still to repair the refresh grant (JWT signing keys), but the expiry bump is the immediate,
-  effective stopgap. Original open item below still stands:
-- **Refresh-token health (open):** verify `POST /auth/v1/token?grant_type=refresh_token`
-  returns 2xx after a clean re-login under the new keys. If it 4xx's, browser sessions can't
-  auto-extend past ~1h — see Still to do.
+- **🔴 Sessions dying mid-use — root-caused + FIX APPLIED, awaiting confirmation (2026-07-06).**
+  A long coach editing session on the roster **silently lost saves**: Sam updated payments/info
+  for \~everyone and "barely any saved." Two problems compounded:
+  1. **Silent UI failure — FIXED + SHIPPED d4e19ed.** The roster "Save changes" button
+     (`saveNote`) was the ONLY action with no error branch — on `!res.ok` it did nothing, so a
+     failed save looked identical to success (data loss with zero indication). Now surfaces the
+     error inline, special-cases 401 as "session expired — refresh + re-sign-in", shows
+     Saving…/disabled. (Its siblings markPaid/grantAccess/delete already alerted on failure.)
+  2. **Session-kill root cause — LIKELY the refresh-token REVOCATION false-positive, not simple
+     expiry.** The browser client uses a **no-op lock** (`lib/supabase/client.ts`, deliberate — a
+     real lock deadlocked getSession). So it doesn't serialise refreshes; a burst of saves →
+     concurrent server-side `getUser` refreshes reusing the rotating refresh token → Supabase's
+     **"Detect and revoke potentially compromised refresh tokens"** reads it as a replay and
+     **revokes the whole session** → everything 401s mid-use. **FIX APPLIED (Supabase → Auth →
+     Sessions → Refresh Tokens):** turned that toggle **OFF** + raised **reuse interval 10s → 30s**.
+     Both editable on Free (only the *User Sessions* block below is Pro-gated). Rotation stays on;
+     only the aggressive auto-revoke is off — acceptable posture for this app.
+     **⏳ CONFIRM before trusting:** log out/in (fresh session picks up the new settings) → edit + save
+     a client → wait 15–20 min → save another → both hold with no red error. If it STILL dies, escalate
+     to the JWT signing-key/refresh path (see note below). **DO NOT touch Project Settings → JWT Keys** —
+     current+previous signing keys are healthy normal rotation; revoking a key there would kill live
+     sessions. The earlier "raise Access token (JWT) expiry to 604800" idea is a *fallback* only —
+     that setting was not findable on Free (possibly Pro-gated); the revocation toggle is the real fix.
+- **Refresh-token health (still worth a positive check):** confirm `POST /auth/v1/token?grant_type=
+  refresh_token` returns 2xx after a clean re-login. The revocation-toggle fix should let refresh
+  succeed; if long sessions still die after it, the signing-key/refresh path is the next suspect.
+- **⚠️ Invite links expiring fast (2026-07-06).** Bulk invite wave went out this afternoon; lads
+  clicking in the evening hit **"link expired"** (Jack, Aidan). Cause = short email-link lifetime
+  (**Email OTP Expiration**, likely 3600s/1h — under Auth → Sign In / Providers → Email). Recovery
+  for anyone expired: **"Forgot password"** on the login page → fresh link (works even pre-activation;
+  auth user already exists). Raising Email OTP Expiration to 86400+ makes future invites forgiving.
+  Note: raising it does NOT revive already-sent links (expiry is baked in at send). Also email
+  security scanners (Outlook etc.) can pre-consume single-use links → instant "expired"; forgot-
+  password still recovers. **No "Resend invite" button exists** (grant-access is idempotent) —
+  forgot-password is the resend path; a proper Resend button is an offered-but-unbuilt nicety.
 - **Email ownership-verify — Supabase setting confirmed (2026-07-05).** Supabase → Auth →
   Email has **Secure email change ON**, so `/api/profile/email` → server
   `auth.updateUser({ email })` runs the strict **double-confirm**: a confirmation goes to
@@ -851,6 +907,6 @@ code/adversarially verified (manual replay smoke-test optional). Also recorded t
 
 **Earlier 2026-07-05 — Security audit + remediation shipped** (`fca29cc`, `f5c6603`): critical client→coach self-promotion fixed + verified on the live DB, all 4 mediums + most lows fixed, adversarially re-verified as non-breaking; deferred items (multi-coach RLS, Next 16 upgrade, 2 minor auth lows) documented, not applied; `ONBOARDING_TEST_MODE` deliberately left ON. Plus **per-client billing frequency** (amount-per-payment + 1/3/6/12-month interval, MRR divides by interval) and a **header-aware / value-based roster importer** (creates pending clients, sends no emails) for Sam's 27-client sheet. Full detail in Recently done.
 
-**Earlier (2026-06-04):** **Stripe sandbox flow verified end-to-end** with a real test purchase (£185, card `4242…`): `checkout.session.completed` → pending client appeared in the roster within seconds. Roster follow-up: every row now shows email under the name, a "via Stripe" chip on Stripe rows, and the expanded row has a new **About** block (email, phone/WhatsApp w/ click-to-WhatsApp, birthday, last login, phase·week, member since) plus a **Stripe — Subscription details** block (customer/sub IDs + Open in Stripe deep-link, Stripe rows only). Phone is editable inline. **One pending action: run `db/2026-06-04_client_phone.sql`.** Then ready to repeat the Stripe setup in LIVE mode for real clients. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
+**Earlier (2026-06-04):** **Stripe sandbox flow verified end-to-end** with a real test purchase (£185, card `4242…`): `checkout.session.completed` → pending client appeared in the roster within seconds. Roster follow-up: every row now shows email under the name, a "via Stripe" chip on Stripe rows, and the expanded row has a new **About** block (email, phone/WhatsApp w/ click-to-WhatsApp, birthday, last login, phase·week, member since) plus a **Stripe — Subscription details** block (customer/sub IDs + Open in Stripe deep-link, Stripe rows only). Phone is editable inline. **One pending action: run db/2026-06-04\_client\_phone.sql.** Then ready to repeat the Stripe setup in LIVE mode for real clients. Still open for go-live: flip `ONBOARDING_TEST_MODE` off + Sam's 2 Loom videos; confirm refresh-token health.
 
 **Plus (rebased in on top):** the **login "Signing in…" wedge is cracked** — auth-js awaits `onAuthStateChange` subscribers inside `signInWithPassword`; the subscriber is now fire-and-forget, the login role check goes via `/api/me`, and every auth call behind a button is timeout-raced. **See the AUTH INVARIANTS in Watch out before touching auth.**
