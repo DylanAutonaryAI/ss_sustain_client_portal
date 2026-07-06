@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { ONBOARDING_STEP_KEYS } from '@/lib/onboarding';
+import { QUESTIONNAIRE_FIELD_IDS } from '@/lib/onboarding-questionnaire';
 
 // The signed-in CLIENT's own onboarding progress. Scoped to user_id, so a
 // client only ever sees/writes their own record. All access goes through the
@@ -54,7 +55,8 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { step_key } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({}));
+  const step_key = body.step_key;
   if (!step_key || !ONBOARDING_STEP_KEYS.includes(step_key)) {
     return NextResponse.json({ error: 'Unknown step.' }, { status: 400 });
   }
@@ -68,6 +70,34 @@ export async function POST(request: NextRequest) {
 
   if (!client) {
     return NextResponse.json({ error: 'No client record for this account.' }, { status: 404 });
+  }
+
+  // Questionnaire step carries the intake answers → store the whole form as JSON.
+  // Only known field ids are kept; values are stringified + length-capped.
+  if (step_key === 'questionnaire' && body.answers && typeof body.answers === 'object') {
+    const clean: Record<string, string> = {};
+    for (const id of QUESTIONNAIRE_FIELD_IDS) {
+      const v = (body.answers as Record<string, unknown>)[id];
+      if (v != null && String(v).trim()) clean[id] = String(v).slice(0, 2000);
+    }
+    const { error: qErr } = await admin
+      .from('onboarding_questionnaire')
+      .upsert(
+        { client_id: client.id, answers: clean, updated_at: new Date().toISOString() },
+        { onConflict: 'client_id' },
+      );
+    if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
+  }
+
+  // Welcome-pack sign step carries the typed name → record the e-signature.
+  if (step_key === 'welcome-pack' && typeof body.signed_name === 'string' && body.signed_name.trim()) {
+    await admin
+      .from('clients')
+      .update({
+        welcome_pack_signed_name: body.signed_name.trim().slice(0, 200),
+        welcome_pack_signed_at: new Date().toISOString(),
+      })
+      .eq('id', client.id);
   }
 
   // Record the step (idempotent — re-posting the same step is a no-op).

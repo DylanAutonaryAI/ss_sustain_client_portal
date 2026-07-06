@@ -151,7 +151,13 @@ export interface PosingTip {
   body: string;
 }
 
-export type OnboardingStepType = 'video' | 'doc' | 'action';
+export type OnboardingStepType =
+  | 'video'          // Loom embed or self-hosted mp4
+  | 'doc'            // open a link/PDF then confirm
+  | 'action'         // open a link (e.g. WhatsApp) then confirm
+  | 'questionnaire'  // the intake form (lib/onboarding-questionnaire)
+  | 'sign'           // view the welcome pack + type name/date to sign
+  | 'calendly';      // embedded Calendly booking
 
 export interface OnboardingStep {
   id: string; // stable key — referenced by onboarding_progress rows; never rename
@@ -164,6 +170,7 @@ export interface OnboardingStep {
   url?: string;
   image?: string;         // optional hero image (public path) shown in place of the doc/action icon
   placeholder?: boolean;  // true = still needs Sam's real video/link/PDF
+  note?: string;          // optional small info line under the description (e.g. "you'll get invites for …")
 }
 
 export type EventType = 'live-call' | 'q-and-a' | 'workshop' | 'challenge' | 'social';

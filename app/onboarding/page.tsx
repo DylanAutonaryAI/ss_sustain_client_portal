@@ -4,12 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ONBOARDING_STEPS, ONBOARDING_STEP_KEYS, ONBOARDING_TEST_MODE, ONBOARDING_ENABLED } from '@/lib/onboarding';
+import { QUESTIONNAIRE_FIELDS } from '@/lib/onboarding-questionnaire';
+import QuestionnaireForm from '@/components/onboarding/QuestionnaireForm';
 import SsLogo from '@/components/ui/SsLogo';
 
 // Testing behaviour (start fresh every login + admin skip button) is on whenever
 // ONBOARDING_TEST_MODE is set, OR in local dev. Flip ONBOARDING_TEST_MODE off at
 // go-live and this reverts to "show onboarding only until completed, no skip".
 const IS_DEV = ONBOARDING_TEST_MODE || process.env.NODE_ENV === 'development';
+
+// A few intake fields must be filled so Sam never gets an empty questionnaire;
+// everything else is encouraged but optional, to keep the flow low-friction.
+const REQUIRED_Q = ['age', 'weight_kg', 'height', 'main_goal'];
 
 // Turn a Loom share URL into its embeddable player URL, so the video plays inline
 // in the portal (showing Loom's own thumbnail) instead of opening a new tab.
@@ -27,6 +33,9 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Intake questionnaire answers (keyed by field id) + welcome-pack signature name.
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [signName, setSignName] = useState('');
   const router = useRouter();
 
   const total = ONBOARDING_STEPS.length;
@@ -36,9 +45,14 @@ export default function OnboardingPage() {
   // Self-hosted video file (in /public) — played with a native <video> element
   // rather than a Loom iframe.
   const isLocalVideo = step.type === 'video' && !!step.url && step.url.startsWith('/') && step.url.endsWith('.mp4');
+  const isQuestionnaire = step.type === 'questionnaire';
+  const isSign = step.type === 'sign';
+  const isCalendly = step.type === 'calendly';
   // Ready to confirm when there's nothing to open first: an embedded video plays
-  // inline, a placeholder has no link, or a doc/action link has already been opened.
-  const isOpened = opened.has(step.id) || !step.url || !!embedUrl || isLocalVideo;
+  // inline, a placeholder has no link, a doc/action link has already been opened,
+  // or the step renders its content inline (questionnaire / sign PDF / Calendly).
+  const isOpened = opened.has(step.id) || !step.url || !!embedUrl || isLocalVideo
+    || isQuestionnaire || isSign || isCalendly;
   const allDone = completedAt !== null;
 
   // Onboarding disabled globally (ONBOARDING_ENABLED=false) → no client is routed
@@ -84,7 +98,7 @@ export default function OnboardingPage() {
     setOpened((prev) => new Set(prev).add(step.id));
   };
 
-  const completeStep = useCallback(async () => {
+  const completeStep = useCallback(async (extra?: Record<string, unknown>) => {
     if (isComplete || saving) return;
     setSaving(true);
     setError('');
@@ -92,7 +106,7 @@ export default function OnboardingPage() {
       const res = await fetch('/api/onboarding/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step_key: step.id }),
+        body: JSON.stringify({ step_key: step.id, ...(extra ?? {}) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -119,6 +133,20 @@ export default function OnboardingPage() {
       setSaving(false);
     }
   }, [isComplete, saving, step.id, currentIdx, total]);
+
+  // Questionnaire submit: validate the few required fields, drop empties, then
+  // save the answers alongside marking the step done.
+  const submitQuestionnaire = useCallback(() => {
+    const missing = REQUIRED_Q.filter((id) => !(answers[id] ?? '').trim());
+    if (missing.length) {
+      const labels = QUESTIONNAIRE_FIELDS.filter((f) => missing.includes(f.id)).map((f) => f.label);
+      setError(`Please fill in: ${labels.join(', ')}.`);
+      return;
+    }
+    const filled: Record<string, string> = {};
+    for (const [k, v] of Object.entries(answers)) if (v.trim()) filled[k] = v.trim();
+    completeStep({ answers: filled });
+  }, [answers, completeStep]);
 
   const handleEnter = () => {
     // In dev the gate always re-routes to onboarding, so set the session bypass
@@ -219,7 +247,7 @@ export default function OnboardingPage() {
             style={{ background: 'var(--bg3)', borderBottom: '1px solid var(--border)' }}
           >
             <span className="text-[10px] font-semibold uppercase tracking-[1.2px]" style={{ color: 'var(--accent-text)' }}>
-              Step {currentIdx + 1} of {total} — {step.type === 'video' ? 'Video' : step.type === 'doc' ? 'Document' : 'Action'}
+              Step {currentIdx + 1} of {total} — {step.type === 'video' ? 'Video' : step.type === 'questionnaire' ? 'Questionnaire' : step.type === 'sign' ? 'Sign' : step.type === 'calendly' ? 'Booking' : step.type === 'doc' ? 'Document' : 'Action'}
             </span>
             {isComplete && (
               <span
@@ -293,8 +321,43 @@ export default function OnboardingPage() {
             </div>
           )}
 
+          {/* Questionnaire — the intake form, rendered inline. */}
+          {isQuestionnaire && (
+            <QuestionnaireForm
+              answers={answers}
+              onChange={(id, v) => setAnswers((prev) => ({ ...prev, [id]: v }))}
+            />
+          )}
+
+          {/* Sign — the welcome-pack PDF inline, plus a new-tab fallback. */}
+          {isSign && (
+            <div style={{ background: 'var(--bg2)' }}>
+              <iframe
+                src={step.url}
+                title="Welcome pack"
+                className="w-full"
+                style={{ height: 460, border: 0, background: '#fff' }}
+              />
+              <div className="px-6 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+                <a href={step.url} target="_blank" rel="noopener noreferrer" className="text-[12px]" style={{ color: 'var(--accent-text)' }}>
+                  Open the welcome pack in a new tab ↗
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Calendly — inline booking widget. */}
+          {isCalendly && (
+            <iframe
+              src={step.url}
+              title="Book your call"
+              className="w-full"
+              style={{ height: 640, border: 0, background: 'var(--bg2)' }}
+            />
+          )}
+
           {/* Doc / action area — a hero image when the step has one, else the icon. */}
-          {step.type !== 'video' && (
+          {(step.type === 'doc' || step.type === 'action') && (
             step.image ? (
               <div className="aspect-video relative" style={{ background: 'var(--bg2)' }}>
                 <Image
@@ -323,7 +386,34 @@ export default function OnboardingPage() {
           {/* Info + button */}
           <div className="px-6 py-5">
             <h2 className="font-serif text-[21px] mb-1.5" style={{ color: 'var(--text)' }}>{step.title}</h2>
-            <p className="text-[13px] leading-[1.75] mb-5" style={{ color: 'var(--text2)' }}>{step.description}</p>
+            <p className="text-[13px] leading-[1.75] mb-4" style={{ color: 'var(--text2)' }}>{step.description}</p>
+
+            {step.note && (
+              <p
+                className="text-[12px] leading-[1.6] mb-4 px-3 py-2.5 rounded-[8px]"
+                style={{ color: 'var(--text2)', background: 'var(--accent-dim)', border: '1px solid var(--accent-mid)' }}
+              >
+                {step.note}
+              </p>
+            )}
+
+            {/* Sign step — type-to-sign, dated today. */}
+            {isSign && !isComplete && (
+              <div className="mb-4">
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.5px] mb-1.5" style={{ color: 'var(--text3)' }}>
+                  Type your full name to sign
+                </label>
+                <input
+                  value={signName}
+                  onChange={(e) => setSignName(e.target.value)}
+                  placeholder="Your full name"
+                  style={{ width: '100%', maxWidth: 360, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 9, color: 'var(--text)', fontSize: 14, padding: '11px 14px', outline: 'none', fontFamily: 'inherit' }}
+                />
+                <p className="text-[11px] mt-2" style={{ color: 'var(--text3)' }}>
+                  By signing you confirm you&apos;ve read and agree to the welcome pack — dated {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.
+                </p>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 flex-wrap">
               {isComplete ? (
@@ -333,6 +423,30 @@ export default function OnboardingPage() {
                 >
                   ✓ Done{!isLastStep && ' — next step below ↓'}
                 </span>
+              ) : isQuestionnaire ? (
+                // Submit the intake form (validates + saves the answers).
+                <button
+                  onClick={submitQuestionnaire}
+                  disabled={saving}
+                  className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-default"
+                  style={{ background: 'var(--accent)' }}
+                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.filter = 'brightness(1.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+                >
+                  {saving ? 'Saving…' : step.confirmLabel ?? 'Submit'}
+                </button>
+              ) : isSign ? (
+                // Sign — needs a typed name.
+                <button
+                  onClick={() => completeStep({ signed_name: signName.trim() })}
+                  disabled={saving || !signName.trim()}
+                  className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-default"
+                  style={{ background: 'var(--accent)' }}
+                  onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.filter = 'brightness(1.08)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
+                >
+                  {saving ? 'Saving…' : step.confirmLabel ?? '✓ Sign & continue'}
+                </button>
               ) : !isOpened ? (
                 // Step has a link/video the client must open first.
                 <button
@@ -345,9 +459,9 @@ export default function OnboardingPage() {
                   {step.type === 'video' ? 'Watch video ↗' : (step.actionLabel ?? 'Open') + ' ↗'}
                 </button>
               ) : (
-                // Opened (or nothing to open) — confirm to mark complete.
+                // Opened (or renders inline, e.g. Calendly) — confirm to mark complete.
                 <button
-                  onClick={completeStep}
+                  onClick={() => completeStep()}
                   disabled={saving}
                   className="px-5 py-2.5 rounded-[9px] text-[13px] font-semibold text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-default"
                   style={{ background: 'var(--accent)' }}
@@ -366,7 +480,7 @@ export default function OnboardingPage() {
                 </button>
               )}
 
-              {step.url && !isComplete && isOpened && !embedUrl && !isLocalVideo && (
+              {step.url && !isComplete && isOpened && !embedUrl && !isLocalVideo && !isQuestionnaire && !isSign && !isCalendly && (
                 <button
                   onClick={openStep}
                   className="text-[12px] transition-colors duration-150"
@@ -435,7 +549,7 @@ export default function OnboardingPage() {
                     className="text-[10px] font-semibold uppercase tracking-[0.8px] flex-shrink-0"
                     style={{ color: 'var(--text3)' }}
                   >
-                    {s.type === 'video' ? s.duration : s.type === 'doc' ? 'Doc' : 'Action'}
+                    {s.type === 'video' ? s.duration : s.type === 'questionnaire' ? 'Form' : s.type === 'sign' ? 'Sign' : s.type === 'calendly' ? 'Book' : s.type === 'doc' ? 'Doc' : 'Action'}
                   </span>
                 </button>
               );

@@ -30,17 +30,13 @@ export const ONBOARDING_TEST_MODE = false;
 //
 // 🔧 Steps with `placeholder: true` still need real content from Sam.
 //
-// DESIGN DECISION (2026-05-27): the portal onboarding COMPLEMENTS Sam's existing
-// onboarding (Jotform application → Calendly call → Brevo 2-day email flow →
-// per-client Loom video) — it doesn't re-do it. By the time a client has portal
-// access, Brevo has already collected the information sheet, the welcome-pack
-// sign & date, and their 1fit / Google Sheets invites. So this gate is LIGHT and
-// portal-specific. The portal is REPLACING Notion, so there is deliberately no
-// "accept your Notion invite" step. Keep it concise (Sam's wish).
-//
-// Welcome-pack signing stays in Brevo (Sam's choice). The portal carries only a
-// quick confirmation "clicker" so it still counts toward the gate and shows up on
-// Sam's roster as done — the actual signing/sending happens in the Brevo email.
+// DESIGN DECISION (2026-07-06): the portal onboarding is now the WHOLE onboarding
+// for new paying clients — it REPLACES Sam's old Brevo 2-day email flow. A client
+// pays on Stripe → is auto-added + auto-invited → lands here and works through
+// every step (videos, the intake questionnaire, signing the welcome pack, booking
+// their call, joining WhatsApp). Only then does the portal unlock. Reached only by
+// clients with clients.onboarding_required = true (new signups); existing/imported
+// clients (all false) never see this.
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
@@ -50,8 +46,9 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     duration: '1 min',
     description: "A personal message from Coach Sam. What you've signed up for, what to expect, and how this journey works.",
     // Self-hosted mp4 (plays via a native <video>, unlike the Loom steps below).
-    // Compressed web copy — the 114MB master is gitignored in public/images.
+    // Compressed web copy — the master is gitignored in public/images.
     url: '/images/welcome-video.mp4',
+    note: "Heads up: you'll also get separate email invites to set up 1fit, Google Sheets and GoCardless — keep an eye on your inbox over the next few days.",
   },
   {
     id: 'portal-tour',
@@ -59,9 +56,14 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     title: 'How to use your portal',
     duration: '5 min',
     description: 'A quick tour of your portal — where to find your training clips, posing, supplements, webinars, recommendations and more. This is your home base, so get familiar with where everything lives.',
-    // Self-hosted mp4 (native <video>). Compressed web copy — the HEVC master is
-    // gitignored in public/images.
     url: '/images/portal-walkthrough-video.mp4',
+  },
+  {
+    id: 'questionnaire',
+    type: 'questionnaire',
+    title: 'Fill out your intake questionnaire',
+    description: "This is how Sam gets to know you — your goals, training, nutrition, health and lifestyle. The more detail you give, the better he can build your plan. It's all confidential and only seen by Sam.",
+    confirmLabel: 'Submit questionnaire',
   },
   {
     id: 'onefit',
@@ -81,10 +83,19 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 'welcome-pack',
-    type: 'action',
+    type: 'sign',
     title: 'Sign your welcome pack',
-    description: "Your welcome pack (sent to your email) is where you sign and date your coaching agreement and send it back to Sam. Once you've done that, confirm here.",
-    confirmLabel: "✓ I've signed & sent it",
+    description: "This is your coaching agreement — Sam's already signed his side. Have a read through, then sign below to confirm you're happy and ready to get started.",
+    // Static PDF served from /public/assets.
+    url: '/assets/welcome-pack.pdf',
+  },
+  {
+    id: 'book-call',
+    type: 'calendly',
+    title: 'Book your welcome call with Sam',
+    description: "Grab a time for your welcome call. This is where you and Sam go through everything together and map out your plan. Pick whatever slot suits you best.",
+    url: 'https://calendly.com/samsuttonpt_consultation-call/coaching-discovery-call',
+    confirmLabel: "✓ I've booked my call",
   },
   {
     id: 'join-community',
@@ -97,11 +108,6 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     image: '/images/team.JPG',
   },
 ];
-
-// NOTE — the check-in guide (/pdfs/check-in-process.pdf) and welcome pack
-// (/pdfs/welcome-guide.pdf) PDFs still live in /public/pdfs and are surfaced
-// elsewhere in the portal. The actual welcome-pack sign-&-date is done in Brevo;
-// the portal step above is just the confirmation clicker.
 
 // Stable keys, in order. Used server-side to validate a posted step and to
 // detect when every step is done.
