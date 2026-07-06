@@ -55,6 +55,7 @@ export default function CoachSidebar() {
       label: 'Clients',
       items: [
         { label: 'Client Roster', href: '/coach/clients', icon: Icons.users, badge: badge('coach:roster') },
+        { label: 'Submissions',   href: '/coach/submissions', icon: Icons.file },
         { label: 'Client Health', href: '/coach/health',  icon: Icons.pulse, badge: badge('coach:health'), badgeColor: 'var(--red)' },
       ],
     },
