@@ -15,7 +15,21 @@
 
 ---
 
-## 📌 Latest handoff note (2026-07-05) — Security remediation shipped + per-client billing
+## 📌 Latest handoff note (2026-07-06) — Referral "Mark joined" now creates the client
+When Sam clicks **Mark joined** on a referral lead and picks a plan, the referred friend is
+now **created on the roster as a pending client** (unless an existing client already matches
+by email). Previously `convert` only *linked* to a pre-existing client row, so referred
+friends never showed up in the roster — Sam had no way to onboard them. New flow: **Mark
+joined → pending client appears → "Grant access & send invite"** (the same pending-client
+pattern as the Stripe purchase flow). One file changed: `app/api/referral/manage/route.ts`
+(`convert` action). **Re-convert is dupe-safe** (the email match finds the row it created);
+**unconvert deliberately leaves the created client in place** (delete it from the roster if the
+conversion was a genuine mistake — safer than auto-wiping a client who may already have access
+or data). No DB migration, no new env var. Typecheck clean. **Pushed + deployed this pass.**
+
+---
+
+## 📎 Recent note (2026-07-05) — Security remediation shipped + per-client billing
 Two things landed this pass, both **pushed to `master` (auto-deployed)** and, where DB
 was involved, **applied + verified against the live database**. Full detail in Recently
 done; the short version:
@@ -764,7 +778,14 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
 
 ---
 
-**Last updated:** 2026-07-05 (later) — **Built the last two deferred auth lows:**
+**Last updated:** 2026-07-06 — **Referral "Mark joined" now lands the friend on the roster.**
+The `convert` action in `app/api/referral/manage/route.ts` now creates a **pending client**
+for a converted referral lead (or links an existing one by email), so Sam can then **"Grant
+access & send invite"** to onboard them — closing the gap where referred friends were tracked
+for payout but never appeared in the client list. Dupe-safe on re-convert; unconvert leaves the
+created client in place. No migration/env change; typecheck clean; pushed + deployed. Prior note below.
+
+**2026-07-05 (later) — Built the last two deferred auth lows:**
 invite-token **single-use** (`clients.invite_accepted_at` + 409 replay-block in
 `/api/set-password`; migration `db/2026-07-05_invite_single_use.sql` **still to run**) and
 **email ownership-verify** (`/api/profile/email` now sends a Supabase confirmation link to

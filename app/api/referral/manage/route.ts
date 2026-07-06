@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { computePayoutDue, payoutState, REFERRAL_REWARD_GBP, type PlanType } from '@/lib/referral';
+import { computePayoutDue, generateReferralCode, payoutState, REFERRAL_REWARD_GBP, type PlanType } from '@/lib/referral';
 
 // Coach-only referral management: list every lead from the coach's clients with
 // its conversion + £100 payout state, convert a lead (picking the plan, which
@@ -81,20 +81,46 @@ export async function POST(request: NextRequest) {
     }
     const joinedAt: string = body.joined_at || new Date().toISOString().slice(0, 10);
     const payoutDue = computePayoutDue(planType, joinedAt);
-    // Best-effort link to the new client's roster row if their email matches one.
+
+    // Land the referred friend on the roster so Sam can onboard them. If they
+    // already match a client by email, link that row; otherwise create a PENDING
+    // client (user_id + access_granted_at null, no invite email) — same shape as
+    // the Stripe / "Add as pending" path — so Sam finishes onboarding and hits
+    // "Grant access & send invite" from the roster to give them portal access.
+    let clientId: string | null = null;
     const { data: match } = await admin
       .from('clients')
       .select('id')
       .eq('coach_id', user.id)
       .ilike('email', lead.email)
       .maybeSingle();
+    if (match) {
+      clientId = match.id;
+    } else {
+      const { data: created, error: createErr } = await admin
+        .from('clients')
+        .insert({
+          user_id: null,
+          coach_id: user.id,
+          full_name: lead.name,
+          email: lead.email,
+          status: 'Active',
+          since: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+          referral_code: generateReferralCode(lead.name),
+          access_granted_at: null, // PENDING — Sam grants access from the roster
+        })
+        .select('id')
+        .single();
+      if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
+      clientId = created?.id ?? null;
+    }
 
     const { error } = await admin.from('referral_leads').update({
       status: 'converted',
       plan_type: planType,
       joined_at: joinedAt,
       payout_due_at: payoutDue,
-      converted_client_id: match?.id ?? null,
+      converted_client_id: clientId,
     }).eq('id', lead_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
