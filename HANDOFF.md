@@ -6,12 +6,46 @@
 
 ---
 
-## 📌 Latest handoff note (2026-07-06 evening) — Existing clients INVITED; two live fixes
+## 📌 Latest handoff note (2026-07-06 late) — Onboarding flow REBUILT (behind flag, safe)
+
+**The onboarding flow is fully rebuilt** for new paying clients (commits `dfd4398` +
+`ab9fa03`). Replaces the old light Brevo-complement gate. **New 8-step flow:** welcome video
+→ portal video → **intake questionnaire** (Sam's ~26-field information sheet, rebuilt as a
+form) → 1fit → MyFitnessPal → **sign welcome pack** (PDF in-frame + type-to-sign) → **book
+call** (Sam's Calendly embedded) → join WhatsApp → full access. Coach sees each client's
+**questionnaire answers + signature** on the expanded roster row. Stripe webhook now
+**auto-invites** new payers + flags `onboarding_required=true` + **emails Sam** (via
+`lib/coach-notify.ts`).
+
+**✅ SAFE — zero live impact:** the entire flow is gated by `clients.onboarding_required`,
+and **all 32 current clients are `false`** → none can see it; there are zero
+`onboarding_required=true` clients and Stripe is still sandbox.
+
+**⚠️ BEFORE TESTING / GO-LIVE:**
+1. **Run `db/2026-07-06_onboarding_questionnaire.sql`** (adds `onboarding_questionnaire`
+   table + `clients.welcome_pack_signed_*`). Until it's run, submitting the questionnaire
+   errors — but nobody reaches it (all clients false), so it's not urgent, just required
+   before testing.
+2. **To test:** set one test client `onboarding_required = true`, log in as them, walk the
+   flow. (In local dev / `ONBOARDING_TEST_MODE` it restarts each login with an admin skip.)
+3. **Sam-notification email** needs env vars in Vercel: `RESEND_API_KEY`, `COACH_NOTIFY_EMAIL`
+   (Sam's inbox), optional `NOTIFY_FROM_EMAIL`. No-ops silently until set (webhook still works).
+4. **Signature** is typed name+date for now — Dylan to confirm if a drawn signature is wanted.
+5. Welcome pack PDF: `public/assets/welcome-pack.pdf`. Calendly:
+   `calendly.com/samsuttonpt_consultation-call/coaching-discovery-call`.
+
+Decisions locked (2026-07-06): auto-invite on payment · full access on completing steps ·
+portal sends Sam the notification · portal replaces the old Brevo 2-day email flow.
+
+---
+
+## 📎 Prior note (2026-07-06 evening) — Existing clients INVITED; two live fixes
 
 **Sam's existing clients are now being invited into the portal.** Branded invite email is live,
 the wave sent **30/31** (1 capped by the email rate limit), all clients skip onboarding
 (`onboarding_required=false`). Full state + carry-forwards are in **🟢 Active** below. Two issues
 surfaced tonight and are handled:
+
 - **Invite "link expired"** (lads clicking hours after send) → recovery is **Forgot password**;
   raise **Email OTP Expiration** for future waves. (Watch out §)
 - **Roster saves silently lost** during long data entry → silent-failure UI **fixed + shipped**
