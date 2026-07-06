@@ -105,8 +105,14 @@ function Card({ sub, open, onToggle }: { sub: Submission; open: boolean; onToggl
                   : 'Not signed yet.'}
               </div>
             </div>
-            <a href={WELCOME_PACK_URL} target="_blank" rel="noopener noreferrer" className="text-[12px] font-semibold flex-shrink-0" style={{ color: 'var(--accent-text)' }}>
-              View the welcome pack ↗
+            <a
+              href={sub.signedName ? `/api/signed-welcome-pack?clientId=${sub.clientId}` : WELCOME_PACK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[12px] font-semibold flex-shrink-0"
+              style={{ color: 'var(--accent-text)' }}
+            >
+              {sub.signedName ? 'View signed welcome pack ↗' : 'View the welcome pack ↗'}
             </a>
           </div>
 
