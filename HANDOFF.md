@@ -48,8 +48,9 @@ done; the short version:
 **Deferred on purpose — do NOT apply without a decision** (each documented in Recently
 done + Watch out): `db/DEFERRED_multi_coach_rls.sql` (latent until a 2nd coach) and the
 **Next major upgrade** (breaking; mitigated by Vercel — **DECISION 2026-07-05: stay on
-Next 14 for now**, go 14→15 first when picked up). **Onboarding gate is now DISABLED
-(`ONBOARDING_ENABLED = false`) so invited clients go straight to the portal — see Active.**
+Next 14 for now**, go 14→15 first when picked up). **Onboarding is now PER-CLIENT
+(`clients.onboarding_required` + a checkbox in the Add-client modal); existing clients go
+straight to the portal — see Active.**
 
 **The two minor auth lows are now BUILT + SHIPPED (2026-07-05, commit `2555550`)** —
 invite-token single-use + email ownership-verify. Migration **applied**; Supabase **Secure
@@ -77,9 +78,10 @@ link — Sam's primary client comms channel, now one click away.
    destination at the same URL, replace both Vercel env vars with live `sk_live_…` and
    `whsec_…`. **Live keys go straight into Vercel — never paste them in chat.**
 3. ~~Flip `ONBOARDING_TEST_MODE` → false + remove skip button~~ **✅ SUPERSEDED (2026-07-05):
-   onboarding gate fully DISABLED via `ONBOARDING_ENABLED = false`; `ONBOARDING_TEST_MODE`
-   also set false. Invited clients go straight to `/portal/home`. Re-enable both when
-   onboarding is wanted for new (Stripe) clients.**
+   onboarding is now PER-CLIENT (`clients.onboarding_required` + Add-client checkbox).
+   `ONBOARDING_TEST_MODE = false`; `ONBOARDING_ENABLED = true` is a global kill-switch.
+   Existing clients (flag false) go straight to `/portal/home`; tick the box for a new client
+   who should see the flow.**
 4. **Sam's 2 Loom videos** (welcome + portal walkthrough) — the only thing blocking
    onboarding go-live.
 5. **Confirm refresh-token health under the new keys** — the "there" fix populates the
@@ -95,19 +97,22 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — inviting Sam's existing clients, onboarding gate OFF
-**Decision (2026-07-05): the onboarding gate is DISABLED.** New master switch
-**`ONBOARDING_ENABLED = false`** in `lib/onboarding.ts` — **no client is ever routed through
-onboarding.** After a client sets their password they land straight on `/portal/home`; they
-never see the onboarding page, videos, or steps. Implemented in
-`components/layout/PortalShell.tsx` (gate effect no-ops when disabled) + `app/onboarding/page.tsx`
-(a stray direct visit bounces to `/portal/home`). `ONBOARDING_TEST_MODE` also set **false** so
-a future re-enable is the real client gate, not the every-login test loop. Typecheck + lint clean.
-- **Why:** move Sam's existing ~27 clients off Notion into the portal NOW, without making them
-  sit through an onboarding flow built for brand-new signups.
-- **Re-enabling later:** flip `ONBOARDING_ENABLED` back to `true` when the Stripe/new-client
-  website flow is built (the NEXT piece of work) and onboarding is wanted for new signups.
-- **To invite the wave:** import the client sheet as pending → roster **"Grant access to all N
+## 🟢 Active — inviting Sam's existing clients; onboarding is now PER-CLIENT
+**Decision (2026-07-05): onboarding is a per-client choice, set at add-time** (commit
+`5a7cfdc`, deployed). New column **`clients.onboarding_required`** (default **false**) + a
+**"Show onboarding flow" checkbox** in the Add-client modal. A client sees onboarding **only if
+their flag is true AND they haven't completed it**; everyone else lands straight on
+`/portal/home`.
+- **Existing / bulk-imported clients** default `false` → straight to home (the invite wave).
+- **Brand-new client** → tick the box in the Add-client modal → they get the welcome videos +
+  setup steps until they finish once, then never again.
+- **Wiring:** `db/2026-07-05_client_onboarding_required.sql` (**APPLIED 2026-07-05**);
+  `/api/invite-client` stores the flag; `/api/onboarding/me` returns `onboardingRequired`;
+  `components/layout/PortalShell.tsx` gate routes on it; `app/onboarding/page.tsx` self-redirects
+  home for anyone who doesn't require it. `ONBOARDING_ENABLED = true` is now a **global
+  kill-switch** (respects per-client flags; set false only to disable the whole flow).
+  `ONBOARDING_TEST_MODE = false`. Typecheck + lint clean.
+- **To invite the existing wave:** import the client sheet as pending → roster **"Grant access to all N
   pending"** (`/api/clients/grant-access-all` — sequential, paced ~120ms to dodge email
   rate-limits). Each client gets the Supabase **"Invite user"** email from the verified
   sssustain.com sender → set-password page → straight to home. Slow clickers whose invite link
@@ -708,12 +713,14 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   `sb_publishable_…` keys. To fix local dev on this machine, pull the new keys into
   `.env.local` (e.g. `vercel env pull`) — the anon + service-role values, plus optionally
   `SUPABASE_DB_URL` so `scripts/run-migration.mjs` works here.
-- **Onboarding gate is OFF** — `ONBOARDING_ENABLED = false` (`lib/onboarding.ts`) makes the
-  gate a no-op: no client is ever routed through onboarding; they land straight on
-  `/portal/home` after setting their password. `ONBOARDING_TEST_MODE` is also `false`. To
-  bring onboarding back for new clients, set `ONBOARDING_ENABLED = true` (and it behaves as the
-  real completed-once gate, since TEST_MODE is false). Gate logic lives in
-  `components/layout/PortalShell.tsx`; the `/onboarding` page self-redirects home when disabled.
+- **Onboarding is PER-CLIENT** — driven by `clients.onboarding_required` (default false), set
+  via the "Show onboarding flow" checkbox in the Add-client modal. A client sees onboarding only
+  if their flag is true AND they haven't completed it; everyone else goes straight to
+  `/portal/home`. `ONBOARDING_ENABLED = true` (`lib/onboarding.ts`) is a **global kill-switch** —
+  set it false to disable onboarding for EVERYONE regardless of their flag. `ONBOARDING_TEST_MODE
+  = false` (when true + a required client, onboarding re-runs every login w/ an admin skip button
+  — dev/testing only). Gate logic: `components/layout/PortalShell.tsx`; `/onboarding` self-
+  redirects home for anyone who doesn't require it.
 - **Browser auth uses a no-op `lock`** (`lib/supabase/client.ts`) — both `navigator.locks`
   and `processLock` deadlocked `getSession()`. Don't re-introduce a blocking lock.
 - **No edge middleware** — `middleware.ts` was removed (it 500'd the whole site). Don't
@@ -751,6 +758,8 @@ event destination + replace Vercel keys with `sk_live_…` / `whsec_…`).
   are covered.
   **✅ `db/2026-07-05_invite_single_use.sql` — APPLIED in Supabase (2026-07-05)** via the SQL
   editor (added `clients.invite_accepted_at`). Invite single-use enforcement is now live.
+  **✅ `db/2026-07-05_client_onboarding_required.sql` — APPLIED (2026-07-05)** via the SQL editor
+  (added `clients.onboarding_required` default false). Per-client onboarding checkbox is live.
   **⛔ `db/DEFERRED_multi_coach_rls.sql` is intentionally NOT applied** — do not run it
   until a 2nd coach is being added, and test on a preview first (see the security entry in
   Recently done). If Vercel ever points at a *different* Supabase than local `.env.local`,
