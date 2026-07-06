@@ -97,7 +97,31 @@ auto-deploys to production. Workflow: `git pull` at start → work in ONE place 
 
 ---
 
-## 🟢 Active — inviting Sam's existing clients; onboarding is now PER-CLIENT
+## 🟢 Active — existing clients INVITED (branded email live); NEXT = Stripe go-live
+**Invite wave went out 2026-07-06.** Branded **"Invite user"** email is live in Supabase
+(dark-brand HTML, green CTA, `applogo.png`) and rendering correctly. "Grant access to all
+pending" sent **30 of 31** invites; the **31st (Reece Giles) hit Supabase's default 30/hr
+email cap** and stayed pending — retry after raising the cap (see rate-limit watch-out).
+All 32 clients are `onboarding_required = false` (verified by query) → they land straight on
+home, no onboarding, and it never reappears on re-login. **Carry-forward:** send the WhatsApp
+"check spam / mark Not Junk" heads-up (30 real emails may spam-folder), raise the email cap,
+re-grant Reece, and verify inbox-vs-spam in the Resend log.
+
+**NEXT WORK — Stripe + landing-page go-live.** Decision (2026-07-06): **manual grant** flow
+(payment → pending client → Sam grants after his call → invite + onboarding). Webhook already
+creates pending clients; **added `onboarding_required = true` to the Stripe insert path only**
+(commit pending) so new website signups see the onboarding flow when granted, while existing/
+imported clients and the "link to existing roster row" path are untouched. Remaining to go
+live: (1) Stripe test→LIVE — live products/prices per plan, a LIVE webhook endpoint at
+`app.sssustain.com/api/stripe/webhook` (same 3 events), and live `sk_live_…`/`whsec_…` into
+Vercel (never in chat); (2) Sam's Framer landing page → point "join/pay" at the LIVE checkout,
+collect name+email(+phone), add a "check your email to set up your portal" success page;
+(3) one live smoke purchase (or Sam's card + refund) to confirm client appears → grant → invite
+→ onboarding → home.
+
+---
+
+## 🟢 Prior active — onboarding is PER-CLIENT
 **Decision (2026-07-05): onboarding is a per-client choice, set at add-time** (commit
 `5a7cfdc`, deployed). New column **`clients.onboarding_required`** (default **false**) + a
 **"Show onboarding flow" checkbox** in the Add-client modal. A client sees onboarding **only if
@@ -121,6 +145,13 @@ their flag is true AND they haven't completed it**; everyone else lands straight
 - ⚠️ **Before the mass send: check/brand the "Invite user" email** in Supabase → Authentication
   → Emails (it's currently whatever's configured — likely the generic default), and glance at
   Auth → Rate Limits if inviting more than ~30 at once.
+- ⚠️ **EMAIL RATE LIMIT (bit us 2026-07-06):** Supabase → Authentication → **Rate Limits →
+  "Rate limit for sending emails"** defaults to **30/hour** — a bulk grant of >30 fails partway
+  ("email rate limit exceeded"). Failed grants leave the client **pending** (retryable, nothing
+  breaks). **Raise to 100/hr before any bulk invite.** Raising the cap unblocks immediately if
+  your recent count is under the new limit. Resend also has its own daily cap (free ~100/day) —
+  check its dashboard for headroom before a big send. The `grant-access-all` ~120ms pacing only
+  dodges per-second limits, not the hourly one.
 
 ---
 

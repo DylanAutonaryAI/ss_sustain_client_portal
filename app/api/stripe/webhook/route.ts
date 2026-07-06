@@ -220,6 +220,11 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     email,
     phone,
     goal: null,
+    // Brand-new signup from the website → they SHOULD see the onboarding flow
+    // (welcome videos + setup) once Sam grants access. Existing/imported clients
+    // stay onboarding_required=false; the manual-link path above never sets this,
+    // so a current client who later buys via Stripe isn't retro-forced into it.
+    onboarding_required: true,
     status: 'Active',
     next_payment_date: nextPaymentDate,
     monthly_amount: monthlyAmount,
