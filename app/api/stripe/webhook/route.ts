@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/server';
 import { generateReferralCode } from '@/lib/referral';
-import { notifyCoach } from '@/lib/coach-notify';
+import { notifyCoach, coachEmail } from '@/lib/coach-notify';
 
 // Stripe webhook — turns a subscription purchase into a fully-onboarding client
 // on Sam's roster, keeps next_payment_date fresh on each renewal, and
@@ -270,15 +270,24 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
 
   // Let Sam know someone paid (best-effort — no-ops if RESEND_API_KEY /
   // COACH_NOTIFY_EMAIL aren't set; never blocks the webhook).
+  const paymentLabel =
+    monthlyAmount != null
+      ? `£${monthlyAmount} · ${intervalToStore === 1 ? 'monthly' : `every ${intervalToStore} months`}`
+      : null;
   await notifyCoach(
     `New SS Sustain client — ${fullName}`,
-    `<p><strong>${fullName}</strong> just paid and has been added to your roster and invited to the portal.</p>
-     <ul>
-       <li>Email: ${email}</li>
-       ${phone ? `<li>Phone: ${phone}</li>` : ''}
-       ${monthlyAmount != null ? `<li>Amount per payment: £${monthlyAmount} (every ${intervalToStore} month${intervalToStore === 1 ? '' : 's'})</li>` : ''}
-     </ul>
-     <p>They'll set their password and work through onboarding — the welcome videos, the intake questionnaire, signing the welcome pack, and booking their call with you. Their questionnaire answers will show on their roster row once submitted.</p>`,
+    coachEmail({
+      heading: 'New client just paid 🎉',
+      intro: `<strong style="color:#f4f4f5;">${fullName}</strong> has paid and been added to your roster — they've been auto-invited to the portal and will now go through onboarding.`,
+      rows: [
+        { label: 'Name', value: fullName },
+        { label: 'Email', value: email },
+        ...(phone ? [{ label: 'Phone', value: phone }] : []),
+        ...(paymentLabel ? [{ label: 'Payment', value: paymentLabel }] : []),
+      ],
+      footerNote:
+        "They'll set their password and work through onboarding — welcome videos, the intake questionnaire, signing the welcome pack, and booking their call with you. Their questionnaire answers appear on their roster row (and in Submissions) once submitted.",
+    }),
   );
 }
 
