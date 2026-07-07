@@ -4,17 +4,19 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { generateReferralCode } from '@/lib/referral';
 import { notifyCoach, coachEmail } from '@/lib/coach-notify';
 
-// Stripe webhook — turns a subscription purchase into a fully-onboarding client
-// on Sam's roster, keeps next_payment_date fresh on each renewal, and
-// auto-cancels the client when Stripe gives up on the subscription.
+// Stripe webhook — turns a purchase into a fully-onboarding client on Sam's
+// roster, keeps next_payment_date fresh on each renewal, and auto-cancels the
+// client when Stripe gives up on a subscription.
 //
 // Pipeline:
 //   checkout.session.completed   → create client, AUTO-INVITE (send portal invite
 //                                  + grant access), flag onboarding_required, and
-//                                  email Sam. (Decision 2026-07-06: fully automatic
-//                                  — the in-portal onboarding IS the gate, no manual
-//                                  grant. The client sets a password and works
-//                                  through onboarding before the portal unlocks.)
+//                                  email Sam. Handles BOTH subscription checkouts
+//                                  (1-2-1 coaching) and ONE-OFF payments (e.g. The
+//                                  Shred Code) — both get the full onboarding flow;
+//                                  only subscriptions track billing/MRR. (Decision
+//                                  2026-07-06: fully automatic — the in-portal
+//                                  onboarding IS the gate, no manual grant.)
 //   invoice.paid                 → bump next_payment_date for renewals
 //   customer.subscription.deleted → flip status to 'Cancelled' + reason
 //
@@ -131,17 +133,26 @@ function periodEndIsoDate(sub: Stripe.Subscription): string | null {
 // ─── Event handlers ──────────────────────────────────────────────────────────
 
 async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.Session) {
-  // We only act on subscription checkouts. Anything else (one-off Payment
-  // Links, setup intents, addons) is ignored without error — Stripe will still
-  // get a 200 back.
-  if (session.mode !== 'subscription') return;
+  // Handle BOTH subscription checkouts (1-2-1 coaching) and ONE-OFF payments
+  // (e.g. "The Shred Code"). Both create a portal client, auto-invite them, put
+  // them through the full onboarding flow, and email Sam. Subscriptions ALSO
+  // track billing (per-payment amount, interval, next payment date → MRR);
+  // one-offs don't (no recurring). Anything else (setup intents, unpaid) is
+  // ignored with a clean 200.
+  //
+  // NOTE: every one-off purchase is treated this way (coaching onboarding). If a
+  // future one-off product should NOT create a coaching client, filter by the
+  // purchased price/product id here.
+  const isSubscription = session.mode === 'subscription';
+  const isOneOff = session.mode === 'payment';
+  if (!isSubscription && !isOneOff) return;
   if (session.payment_status !== 'paid') return;
 
   const email = session.customer_details?.email || session.customer_email;
   if (!email) return;
-  const fullName =
-    session.customer_details?.name?.trim() ||
-    email.split('@')[0];
+  const fullName = session.customer_details?.name?.trim() || email.split('@')[0];
+  // Stripe collects phone only when the merchant enables it; E.164 when present.
+  const phone = session.customer_details?.phone ?? null;
 
   const customerId = typeof session.customer === 'string'
     ? session.customer
@@ -149,72 +160,70 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   const subscriptionId = typeof session.subscription === 'string'
     ? session.subscription
     : session.subscription?.id ?? null;
-  if (!subscriptionId) return;
 
   const admin = await createAdminClient();
 
-  // Idempotency check: same subscription means same client. Stripe will
-  // happily resend this event during retries.
-  const { data: existing } = await admin
-    .from('clients')
-    .select('id')
-    .eq('stripe_subscription_id', subscriptionId)
-    .maybeSingle();
-  if (existing) return;
+  // Billing fields — meaningful only for subscriptions; one-offs leave them null
+  // so they don't inflate MRR.
+  let nextPaymentDate: string | null = null;
+  let monthlyAmount: number | null = null;
+  let intervalToStore = 1;
+  let supported = false;
+
+  if (isSubscription) {
+    if (!subscriptionId) return;
+    // Idempotency: same subscription → same client (Stripe retries).
+    const { data: existing } = await admin
+      .from('clients').select('id').eq('stripe_subscription_id', subscriptionId).maybeSingle();
+    if (existing) return;
+
+    // Pull the subscription for next_payment_date + the price (amount/interval).
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    nextPaymentDate = periodEndIsoDate(sub);
+    const price = sub.items?.data?.[0]?.price;
+    const intervalUnit = price?.recurring?.interval;           // 'month' | 'year' | ...
+    const intervalCount = price?.recurring?.interval_count ?? 1;
+    const billingIntervalMonths =
+      intervalUnit === 'month' ? intervalCount :
+      intervalUnit === 'year' ? intervalCount * 12 : null;
+    supported = price?.currency === 'gbp' && billingIntervalMonths != null && [1, 3, 6, 12].includes(billingIntervalMonths);
+    monthlyAmount = supported && price?.unit_amount != null ? price.unit_amount / 100 : null;
+    intervalToStore = supported ? billingIntervalMonths! : 1;
+  } else {
+    // One-off: no subscription — key idempotency on the Checkout session id.
+    const { data: existing } = await admin
+      .from('clients').select('id').eq('stripe_session_id', session.id).maybeSingle();
+    if (existing) return;
+  }
 
   const coachId = await getDefaultCoachId(admin);
   if (!coachId) {
     throw new Error('No coach configured (profiles.role = coach) — cannot route new Stripe client.');
   }
 
-  // Pull the subscription so we can stamp next_payment_date. If this call
-  // fails Stripe will retry the whole webhook later.
-  const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  const nextPaymentDate = periodEndIsoDate(sub);
-
-  // Per-payment amount (installment) + billing interval from the subscription's
-  // price, so MRR counts Stripe clients the same way as manually-tracked ones.
-  // Supports monthly and annual GBP prices (interval_count months); anything else
-  // (non-GBP, weekly, etc.) leaves the amount null → falls back to the ledger.
-  const price = sub.items?.data?.[0]?.price;
-  const intervalUnit = price?.recurring?.interval;           // 'month' | 'year' | ...
-  const intervalCount = price?.recurring?.interval_count ?? 1;
-  const billingIntervalMonths =
-    intervalUnit === 'month' ? intervalCount :
-    intervalUnit === 'year' ? intervalCount * 12 : null;
-  const supported = price?.currency === 'gbp' && billingIntervalMonths != null && [1, 3, 6, 12].includes(billingIntervalMonths);
-  const monthlyAmount = supported && price?.unit_amount != null ? price.unit_amount / 100 : null; // the installment
-  const intervalToStore = supported ? billingIntervalMonths! : 1;
-
-  // Stripe Payment Links collect phone only when the merchant enables it; when
-  // present it's an E.164 string. Defensively read it either way — surfaces in
-  // the roster's About block with a wa.me link if set, blank if not.
-  const phone = session.customer_details?.phone ?? null;
-
   // If this person already exists on the roster as a manual/imported row (same
-  // email, no Stripe link yet), LINK Stripe to that row instead of inserting a
-  // duplicate — otherwise MRR would count the same human twice.
+  // email, not yet linked to any Stripe purchase), LINK to it instead of
+  // duplicating the human.
   const { data: manualRow } = await admin
     .from('clients')
     .select('id')
     .eq('coach_id', coachId)
     .ilike('email', email)
     .is('stripe_subscription_id', null)
+    .is('stripe_session_id', null)
     .maybeSingle();
   if (manualRow) {
-    // Only overwrite the rate/interval when we actually derived one from a
-    // supported price — never null out a rate the coach already entered manually.
-    const rateFields = supported ? { monthly_amount: monthlyAmount, billing_interval_months: intervalToStore } : {};
-    const { error: linkErr } = await admin
-      .from('clients')
-      .update({
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscriptionId,
-        next_payment_date: nextPaymentDate,
-        status: 'Active',
-        ...rateFields,
-      })
-      .eq('id', manualRow.id);
+    const linkFields: Record<string, unknown> = { stripe_customer_id: customerId, status: 'Active' };
+    if (isSubscription) {
+      linkFields.stripe_subscription_id = subscriptionId;
+      linkFields.next_payment_date = nextPaymentDate;
+      // Only overwrite the rate when we derived a supported one — never null out
+      // a rate the coach entered manually.
+      if (supported) { linkFields.monthly_amount = monthlyAmount; linkFields.billing_interval_months = intervalToStore; }
+    } else {
+      linkFields.stripe_session_id = session.id;
+    }
+    const { error: linkErr } = await admin.from('clients').update(linkFields).eq('id', manualRow.id);
     if (linkErr) throw new Error(`Failed to link Stripe to existing client: ${linkErr.message}`);
     return;
   }
@@ -231,7 +240,6 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   );
   if (inviteError) {
     if (inviteError.message.includes('already been registered')) {
-      // They already have an auth login (e.g. a returning client) — link it.
       const { data: list } = await admin.auth.admin.listUsers();
       invitedUserId = list?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())?.id ?? null;
     } else {
@@ -248,15 +256,11 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     email,
     phone,
     goal: null,
-    // Brand-new signup from the website → they go through the full onboarding flow
-    // (videos, questionnaire, welcome pack, booking a call) before the portal
-    // unlocks. Existing/imported clients stay onboarding_required=false; the
-    // manual-link path above never sets this, so a current client who later buys
-    // via Stripe isn't retro-forced into it.
+    // New website signup → full onboarding flow before the portal unlocks.
     onboarding_required: true,
     status: 'Active',
-    next_payment_date: nextPaymentDate,
-    monthly_amount: monthlyAmount,
+    next_payment_date: nextPaymentDate,      // null for one-off
+    monthly_amount: monthlyAmount,           // null for one-off (not MRR)
     billing_interval_months: intervalToStore,
     notes: null,
     since: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
@@ -264,16 +268,16 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
     // Auto-granted on payment — the onboarding flow (not a manual grant) is the gate.
     access_granted_at: new Date().toISOString(),
     stripe_customer_id: customerId,
-    stripe_subscription_id: subscriptionId,
+    stripe_subscription_id: subscriptionId,  // null for one-off
+    stripe_session_id: isOneOff ? session.id : null,
   });
   if (error) throw new Error(`Failed to insert client: ${error.message}`);
 
   // Let Sam know someone paid (best-effort — no-ops if RESEND_API_KEY /
   // COACH_NOTIFY_EMAIL aren't set; never blocks the webhook).
-  const paymentLabel =
-    monthlyAmount != null
-      ? `£${monthlyAmount} · ${intervalToStore === 1 ? 'monthly' : `every ${intervalToStore} months`}`
-      : null;
+  const paymentLabel = isSubscription
+    ? (monthlyAmount != null ? `£${monthlyAmount} · ${intervalToStore === 1 ? 'monthly' : `every ${intervalToStore} months`}` : null)
+    : (session.amount_total != null ? `£${(session.amount_total / 100).toFixed(2).replace(/\.00$/, '')} · one-off` : 'One-off purchase');
   await notifyCoach(
     `New SS Sustain client — ${fullName}`,
     coachEmail({
