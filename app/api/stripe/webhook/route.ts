@@ -146,7 +146,10 @@ async function handleCheckoutCompleted(stripe: Stripe, session: Stripe.Checkout.
   const isSubscription = session.mode === 'subscription';
   const isOneOff = session.mode === 'payment';
   if (!isSubscription && !isOneOff) return;
-  if (session.payment_status !== 'paid') return;
+  // 'paid' = a normal purchase; 'no_payment_required' = a £0 checkout (a 100%-off
+  // promo code, a comp, or a free trial). Both should grant access — the latter
+  // also lets us test the whole live funnel end-to-end without a real charge.
+  if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') return;
 
   const email = session.customer_details?.email || session.customer_email;
   if (!email) return;
