@@ -6,36 +6,57 @@
 
 ---
 
-## 📌 Latest handoff note (2026-07-06 late) — Onboarding flow REBUILT (behind flag, safe)
+## 📌 Latest handoff note (2026-07-07) — 🟢 STRIPE + ONBOARDING FUNNEL LIVE & VERIFIED E2E
 
-**The onboarding flow is fully rebuilt** for new paying clients (commits `dfd4398` +
-`ab9fa03`). Replaces the old light Brevo-complement gate. **New 8-step flow:** welcome video
-→ portal video → **intake questionnaire** (Sam's ~26-field information sheet, rebuilt as a
-form) → 1fit → MyFitnessPal → **sign welcome pack** (PDF in-frame + type-to-sign) → **book
-call** (Sam's Calendly embedded) → join WhatsApp → full access. Coach sees each client's
-**questionnaire answers + signature** on the expanded roster row. Stripe webhook now
-**auto-invites** new payers + flags `onboarding_required=true` + **emails Sam** (via
-`lib/coach-notify.ts`).
+**The full new-client funnel is LIVE and confirmed working end-to-end on real Stripe
+(2026-07-07):** pay → client on roster → auto-invite email → onboarding flow (questionnaire,
+welcome pack sign, book call, videos) → Sam's branded "New client" email → answers/signature
+show in the coach **Submissions** tab. Tested with a live £0 coaching checkout (100%-off code).
 
-**✅ SAFE — zero live impact:** the entire flow is gated by `clients.onboarding_required`,
-and **all 32 current clients are `false`** → none can see it; there are zero
-`onboarding_required=true` clients and Stripe is still sandbox.
+**🔑 THE BUG THAT BLOCKED IT (now fixed) — STRIPE\_SECRET\_KEY was a TEST key on LIVE events.**
+Symptom: `checkout.session.completed` deliveries 500'd with *"No such subscription … a similar
+object exists in live mode, but a test mode key was used."* The webhook secret was fine (sig
+verified); only the API key was test. **Fix: STRIPE\_SECRET\_KEY in Vercel must be the LIVE
+sk\_live\_… key.** (Only the checkout handler calls Stripe's API — that's why invoice/cancel
+events returned 200 and it looked like a partial failure.)
 
-**⚠️ BEFORE TESTING / GO-LIVE:**
-1. **Run `db/2026-07-06_onboarding_questionnaire.sql`** (adds `onboarding_questionnaire`
-   table + `clients.welcome_pack_signed_*`). Until it's run, submitting the questionnaire
-   errors — but nobody reaches it (all clients false), so it's not urgent, just required
-   before testing.
-2. **To test:** set one test client `onboarding_required = true`, log in as them, walk the
-   flow. (In local dev / `ONBOARDING_TEST_MODE` it restarts each login with an admin skip.)
-3. **Sam-notification email** needs env vars in Vercel: `RESEND_API_KEY`, `COACH_NOTIFY_EMAIL`
-   (Sam's inbox), optional `NOTIFY_FROM_EMAIL`. No-ops silently until set (webhook still works).
-4. **Signature** is typed name+date for now — Dylan to confirm if a drawn signature is wanted.
-5. Welcome pack PDF: `public/assets/welcome-pack.pdf`. Calendly:
-   `calendly.com/samsuttonpt_consultation-call/coaching-discovery-call`.
+**Funnel test method (for re-testing later):** a **100%-off promo code works on the
+subscription** (coaching → £0) but **NOT on a one-off** (Shred Code — Stripe won't let a
+one-time payment hit £0). So test the funnel via the £0 coaching checkout; the downstream
+(onboarding/email/roster) is identical for both. **After a test: cancel the test subscription
+in Stripe + delete the test client off the roster.** The one-off path itself is code-verified
+but not yet £0-testable — do a \~£1-and-refund if you want to exercise it specifically.
 
-Decisions locked (2026-07-06): auto-invite on payment · full access on completing steps ·
-portal sends Sam the notification · portal replaces the old Brevo 2-day email flow.
+**Onboarding rebuild (the build behind all this):** commits `dfd4398`, `ab9fa03`, `95d2f90`,
+`599445d`, `cab0665`, `9cfca2b`, `29155ff`. New 8-step flow (welcome video → portal video →
+**intake questionnaire** → 1fit → MyFitnessPal → **sign welcome pack** (PDF + type-to-sign,
+signature stamped onto the PDF via pdf-lib) → **book call** (Calendly) → WhatsApp → full
+access). Coach **Submissions** tab + expanded-row view show answers + signature. Stripe webhook
+auto-invites, flags `onboarding_required=true`, handles subscriptions AND one-offs, and emails
+Sam (`lib/coach-notify.ts`, branded).
+
+**✅ Existing 32 clients unaffected throughout:** all `onboarding_required = false` → they never
+see any of this; only new Stripe signups do.
+
+**✅ ALL PREREQUISITES DONE:** migrations run (`onboarding_questionnaire` + `welcome_pack_*`
++ `stripe_session_id`); Vercel env set (`RESEND_API_KEY`, `COACH_NOTIFY_EMAIL`,
+`STRIPE_SECRET_KEY = sk_live_…`, `STRIPE_WEBHOOK_SECRET = live whsec_…`); Stripe live products
+(coaching £185/mo + Shred Code £99 one-off), live webhook endpoint (3 events), live payment
+links on the landing page. Funnel tested + verified live 2026-07-07.
+
+**⬜ Small open items (non-blocking):**
+- **Signature** is typed name+date (stamped onto the PDF via pdf-lib). Dylan to confirm later
+  if a *drawn* signature pad is wanted.
+- **One-off Shred Code path:** code-verified but not £0-testable (Stripe minimum) — do a
+  ~£1-and-refund if you want to exercise that exact path.
+- **Test cleanup:** cancel any test subscriptions in Stripe + delete test clients off the roster.
+
+Reference: welcome pack PDF `public/assets/welcome-pack.pdf`; Calendly
+`calendly.com/samsuttonpt_consultation-call/coaching-discovery-call`.
+
+Decisions locked (2026-07-06/07): auto-invite on payment · full access on completing steps ·
+portal sends Sam the notification · Shred Code (one-off) gets the SAME coaching onboarding ·
+portal replaces the old Brevo 2-day email flow.
 
 ---
 
