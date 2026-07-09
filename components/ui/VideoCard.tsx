@@ -1,12 +1,19 @@
 'use client';
 
-// Turn a Loom share URL into its embeddable player URL, so the video plays
-// inline (showing Loom's own thumbnail + play) instead of opening a new tab.
-// Mirrors the helper used in the onboarding flow.
-function loomEmbedUrl(url?: string): string | null {
+// Turn a supported video share URL into its embeddable player URL, so it plays
+// INLINE (its own thumbnail + play) instead of opening a new tab. Supports Loom
+// and YouTube — YouTube "unlisted" videos embed identically to public ones, so
+// nothing special is needed for them. Handles watch?v=, youtu.be, /embed/,
+// /live/ and /shorts/ forms (with any extra query params). Anything else
+// (Fathom, Vimeo, a raw file…) returns null → the card falls back to
+// click-to-open-in-a-new-tab.
+function toEmbedUrl(url?: string): string | null {
   if (!url) return null;
-  const m = url.match(/loom\.com\/share\/([a-zA-Z0-9-]+)/);
-  return m ? `https://www.loom.com/embed/${m[1]}` : null;
+  const loom = url.match(/loom\.com\/share\/([a-zA-Z0-9-]+)/);
+  if (loom) return `https://www.loom.com/embed/${loom[1]}`;
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|live\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+  return null;
 }
 
 interface VideoCardProps {
@@ -19,10 +26,10 @@ interface VideoCardProps {
 }
 
 export default function VideoCard({ tag, title, meta, url, embed }: VideoCardProps) {
-  const embedUrl = embed ? loomEmbedUrl(url) : null;
+  const embedUrl = embed ? toEmbedUrl(url) : null;
 
-  // Embedded mode: render the Loom player inline so it shows its own thumbnail
-  // and plays in place — matches the onboarding flow.
+  // Embedded mode: render the player (Loom or YouTube) inline so it shows its own
+  // thumbnail and plays in place.
   if (embedUrl) {
     return (
       <div
