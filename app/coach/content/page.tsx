@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Topbar from '@/components/layout/Topbar';
 import { useContent } from '@/context/ContentContext';
 import type { Supplement, MindsetTip, GymBagItem, ShoppingCategory, NonNegotiable, Webinar, VideoClip, PdfResource, PosingVideo, PosingTip } from '@/lib/types';
@@ -63,6 +63,45 @@ function RemoveBtn({ onClick }: { onClick: () => void }) {
       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(240,79,79,0.35)'; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border2)'; }}
     >Remove</button>
+  );
+}
+
+// Upload a PDF straight to the portal's storage and hand the resulting public URL
+// back to the form (fills the resource's URL field). Coach-only route.
+function PdfUpload({ onUploaded }: { onUploaded: (url: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true); setMsg('');
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/content/upload', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) { onUploaded(data.url); setMsg(`Uploaded ✓ ${data.name ?? ''}`.trim()); }
+      else setMsg(data.error || 'Upload failed.');
+    } catch {
+      setMsg('Could not upload. Try again.');
+    } finally {
+      setBusy(false);
+      if (ref.current) ref.current.value = '';
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <input ref={ref} type="file" accept="application/pdf,.pdf" onChange={pick} style={{ display: 'none' }} />
+      <button type="button" onClick={() => ref.current?.click()} disabled={busy}
+        style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)', borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1 }}>
+        {busy ? 'Uploading…' : '⬆ Upload a PDF'}
+      </button>
+      <span style={{ fontSize: 11, color: 'var(--text3)' }}>or paste a link above</span>
+      {msg && <span style={{ fontSize: 11, color: msg.includes('✓') ? 'var(--accent-text)' : 'var(--red)' }}>{msg}</span>}
+    </div>
   );
 }
 
@@ -620,7 +659,10 @@ function LibraryEditor() {
   const formJsx = (onSave: () => void, onCancel: () => void) => (
     <FormCard>
       <Field label="Title"><input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="e.g. Meal Recipes Vol. 1" style={inputStyle} /></Field>
-      <Field label="URL or Path"><input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="/pdfs/MEAL RECIPES 01.pdf or https://..." style={inputStyle} /></Field>
+      <Field label="PDF (upload or link)">
+        <input value={draft.url ?? ''} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))} placeholder="Upload below, or paste a link / /pdfs/… path" style={inputStyle} />
+        <PdfUpload onUploaded={(url) => setDraft(d => ({ ...d, url }))} />
+      </Field>
       <Field label="Meta (shown below title)"><input value={draft.meta} onChange={e => setDraft(d => ({ ...d, meta: e.target.value }))} placeholder="PDF · Recipe collection" style={inputStyle} /></Field>
       <div style={{ display: 'flex', gap: 8 }}><SaveBtn onClick={onSave} /><CancelBtn onClick={onCancel} /></div>
     </FormCard>
