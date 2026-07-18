@@ -6,7 +6,42 @@
 
 ---
 
-## 📌 Latest handoff note (2026-07-07) — 🟢 STRIPE + ONBOARDING FUNNEL LIVE & VERIFIED E2E
+## 📌 Latest handoff note (2026-07-18) — Client Clips (form-check video uploads) BUILT & pushed
+
+**Clients can now upload their own form-check clips from their phone; Sam reviews them per
+client.** Commit `624c332`. Built on the other machine and rebased onto the 2026-07-07 remote
+(no conflicts beyond a one-line CoachSidebar nav merge). **`npm install` after pulling** — the
+remote's onboarding work added `pdf-lib`, and this session's build needs it.
+
+**What it is (kept deliberately separate from the two look-alike features):**
+- **Client side** — the **Training Clips** page (`/portal/training`) gained a "Submit your clips"
+  uploader (`components/portal/ClipSubmitter.tsx`): pick a video → uploads **straight to
+  Cloudflare Stream** (browser → Cloudflare, bypassing Vercel's ~4.5MB body limit) → their own
+  list with a status + a "Reviewed by Sam" state. Sam's reference demos still show on top.
+- **Coach side** — new **Client Clips** nav item (under Clients), page `/coach/client-clips`:
+  every client with an "N new" unreviewed badge → open one → watch (private, signed playback),
+  **Mark reviewed**, delete. Nav badge = live count of unreviewed clips. **Deep-link** from each
+  roster row ("View clips →", next to the meal tracker).
+- **NOT** the Content Manager → **Training Vids** (Sam's reference demos, coach→client, link-based)
+  and **NOT** the **Submissions** tab (onboarding questionnaires + welcome packs). New
+  `client_clips` table + Cloudflare, opposite direction, different screens — zero shared code.
+
+**Engine: Cloudflare Stream** (chosen for transcoding — an iPhone HEVC clip plays on any device
+Sam opens; private `requireSignedURLs` + short-lived signed iframe tokens for coach/owner-only
+playback; ~6-week auto-prune via `scheduledDeletion`). Cost ≈ **$5/mo** at ~25 clients.
+
+**⚙️ TO SWITCH IT ON (it is dormant + safe until then — graceful 503, like Stripe/assistant):**
+set **`CLOUDFLARE_ACCOUNT_ID`** + **`CLOUDFLARE_STREAM_API_TOKEN`** (an API token with the
+**Stream:Edit** permission) in **Vercel** (+ local `.env.local`). Both are server-only/Sensitive.
+Migration **`db/2026-07-18_client_clips.sql` already applied** (client_clips, RLS-locked,
+service-role only). Nothing else required.
+
+**Open decision for Dylan:** built on **Cloudflare Stream** per the recommendation; if you'd
+rather use **Bunny Stream** (~£1–2/mo, also transcodes) the swap is confined to `lib/stream.ts`.
+
+---
+
+## 📎 Recent note (2026-07-07) — 🟢 STRIPE + ONBOARDING FUNNEL LIVE & VERIFIED E2E
 
 **The full new-client funnel is LIVE and confirmed working end-to-end on real Stripe
 (2026-07-07):** pay → client on roster → auto-invite email → onboarding flow (questionnaire,
