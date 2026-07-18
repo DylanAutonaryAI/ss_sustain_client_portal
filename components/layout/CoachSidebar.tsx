@@ -27,6 +27,20 @@ export default function CoachSidebar() {
       .catch(() => {});
   }, []);
 
+  // Client form-check clips awaiting review — drives the Client Clips badge
+  // (a live count of un-reviewed clips across all clients, not seen-based).
+  const [clipsUnreviewed, setClipsUnreviewed] = useState(0);
+  useEffect(() => {
+    fetch('/api/client-clips/coach', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.clients)) {
+          setClipsUnreviewed(d.clients.reduce((s: number, c: { unreviewed?: number }) => s + (c.unreviewed ?? 0), 0));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Same churn definition as the Overview page.
   const churnIds = clients
     .filter((c) => c.healthScore < 40 || c.payment === 'Overdue')
@@ -54,9 +68,10 @@ export default function CoachSidebar() {
     {
       label: 'Clients',
       items: [
-        { label: 'Client Roster', href: '/coach/clients', icon: Icons.users, badge: badge('coach:roster') },
-        { label: 'Submissions',   href: '/coach/submissions', icon: Icons.file },
-        { label: 'Client Health', href: '/coach/health',  icon: Icons.pulse, badge: badge('coach:health'), badgeColor: 'var(--red)' },
+        { label: 'Client Roster', href: '/coach/clients',      icon: Icons.users, badge: badge('coach:roster') },
+        { label: 'Submissions',   href: '/coach/submissions',  icon: Icons.file },
+        { label: 'Client Clips',  href: '/coach/client-clips',  icon: Icons.play,  badge: mounted && clipsUnreviewed > 0 ? clipsUnreviewed : undefined },
+        { label: 'Client Health', href: '/coach/health',       icon: Icons.pulse, badge: badge('coach:health'), badgeColor: 'var(--red)' },
       ],
     },
     {

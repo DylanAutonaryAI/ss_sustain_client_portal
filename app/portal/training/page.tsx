@@ -2,6 +2,7 @@
 
 import PortalTopbar from '@/components/layout/PortalTopbar';
 import VideoCard from '@/components/ui/VideoCard';
+import ClipSubmitter from '@/components/portal/ClipSubmitter';
 import { useContent } from '@/context/ContentContext';
 
 export default function TrainingPage() {
@@ -33,31 +34,13 @@ export default function TrainingPage() {
           </>
         )}
 
-        {/* Client submission guide */}
+        {/* Client submission — upload straight from the phone */}
         <div className="flex items-center justify-between mb-3.5">
           <span className="font-serif text-[16px] tracking-[-0.2px]" style={{ color: 'var(--text)' }}>Submitting your clips</span>
         </div>
 
-        <div
-          className="rounded-xl px-[22px] py-5 mb-6"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}
-        >
-          <h3 className="text-[14px] font-semibold mb-3" style={{ color: 'var(--text)' }}>How it works</h3>
-          <ol className="space-y-2">
-            {[
-              'Film your exercise — aim for a clear side or rear angle',
-              'Save the clip to your camera roll or cloud storage',
-              'Send some clips each week via the messaging tab or your check-in',
-              'Sam will review your form and leave feedback on your next check-in',
-            ].map((step, i) => (
-              <li key={i} className="flex items-start gap-3 text-[13px] leading-[1.6]" style={{ color: 'var(--text2)' }}>
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-[1px]" style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)' }}>
-                  {i + 1}
-                </span>
-                {step}
-              </li>
-            ))}
-          </ol>
+        <div className="mb-6">
+          <ClipSubmitter />
         </div>
 
         <div className="mb-6">

@@ -1080,6 +1080,32 @@ export default function ClientRosterPage() {
                     {/* Meal tracker — read-only, lazily loaded when this row opens */}
                     <TrackerSummary clientId={c.id} clientName={c.name} />
 
+                    {/* Quick link to this client's form-check clips (the separate
+                        Client Clips review area — kept out of this panel to avoid
+                        crowding it). */}
+                    <a
+                      href={`/coach/client-clips?client=${c.id}`}
+                      className="col-span-2 rounded-[10px] px-4 py-3 flex items-center justify-between gap-4"
+                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)', textDecoration: 'none' }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--surface)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg2)'; }}
+                    >
+                      <div>
+                        <h3 className="text-[13px] font-semibold mb-0.5" style={{ color: 'var(--text)' }}>
+                          Form-check clips
+                        </h3>
+                        <p className="text-[12px]" style={{ color: 'var(--text3)' }}>
+                          Watch the training clips {c.name.split(' ')[0]} has submitted and mark them reviewed.
+                        </p>
+                      </div>
+                      <span
+                        className="text-[13px] font-semibold px-3 py-1.5 rounded-[8px] flex-shrink-0"
+                        style={{ background: 'var(--accent-dim)', color: 'var(--accent-text)', border: '1px solid var(--accent-mid)' }}
+                      >
+                        View clips →
+                      </span>
+                    </a>
+
                     {/* Client status + reason (full width) */}
                     <div className="col-span-2">
                       <h3 className="text-[13px] font-semibold mb-1" style={{ color: 'var(--text)' }}>
