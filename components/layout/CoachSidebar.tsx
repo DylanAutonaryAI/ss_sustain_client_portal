@@ -41,6 +41,15 @@ export default function CoachSidebar() {
       .catch(() => {});
   }, []);
 
+  // Lead-magnet signups — drives the Lead Magnets "new leads" badge (seen-based).
+  const [leadIds, setLeadIds] = useState<string[] | null>(null);
+  useEffect(() => {
+    fetch('/api/lead-magnets', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (Array.isArray(d?.leads)) setLeadIds(d.leads.map((l: { id: string }) => l.id)); })
+      .catch(() => {});
+  }, []);
+
   // Same churn definition as the Overview page.
   const churnIds = clients
     .filter((c) => c.healthScore < 40 || c.payment === 'Overdue')
@@ -49,7 +58,8 @@ export default function CoachSidebar() {
   const entries: UnseenEntry[] = [
     { key: 'coach:roster',    href: '/coach/clients',     ids: clients.map((c) => c.id) },
     { key: 'coach:health',    href: '/coach/health',      ids: churnIds },
-    { key: 'coach:referrals', href: '/coach/leaderboard', ids: referralIds },
+    { key: 'coach:referrals',   href: '/coach/leaderboard',  ids: referralIds },
+    { key: 'coach:leadmagnets', href: '/coach/lead-magnets', ids: leadIds },
   ];
 
   const counts = useUnseenCounts(entries);
@@ -79,8 +89,9 @@ export default function CoachSidebar() {
       items: [
         { label: 'Revenue',          href: '/coach/revenue',     icon: Icons.dollar   },
         { label: 'Revenue Forecast', href: '/coach/forecast',    icon: Icons.trendUp  },
-        { label: 'Referrals',        href: '/coach/leaderboard', icon: Icons.users,    badge: badge('coach:referrals') },
-        { label: 'Analytics',        href: '/coach/analytics',   icon: Icons.barChart },
+        { label: 'Referrals',        href: '/coach/leaderboard',   icon: Icons.users,    badge: badge('coach:referrals') },
+        { label: 'Lead Magnets',     href: '/coach/lead-magnets',  icon: Icons.magnet,   badge: badge('coach:leadmagnets') },
+        { label: 'Analytics',        href: '/coach/analytics',     icon: Icons.barChart },
       ],
     },
     {
