@@ -4,6 +4,7 @@ import { useState } from 'react';
 import PortalTopbar from '@/components/layout/PortalTopbar';
 import MiniCalendar from '@/components/ui/MiniCalendar';
 import { useCommunity, EVENT_STYLES } from '@/context/CommunityContext';
+import AddToCalendar from '@/components/ui/AddToCalendar';
 import type { CommunityEvent, EventRSVP } from '@/lib/types';
 
 function formatEventDate(dateStr: string) {
@@ -104,6 +105,10 @@ function EventCard({ event, highlighted }: { event: CommunityEvent; highlighted?
             {dateInfo.weekday} · {event.time} · {event.duration}
           </p>
           <p className="text-[12px] leading-[1.6]" style={{ color: 'var(--text2)' }}>{event.description}</p>
+
+          <div className="mt-2.5">
+            <AddToCalendar event={event} />
+          </div>
 
           <div className="mt-4">
             {showButtons && !decliningOpen && (
