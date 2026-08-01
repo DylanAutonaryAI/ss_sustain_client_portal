@@ -66,6 +66,13 @@ export async function refreshPending(admin: AdminDb, rows: ClipRow[]): Promise<C
           await admin.from('client_clips').update({ status: 'error' }).eq('id', r.id);
           return { id: r.id, status: 'error' };
         }
+        // Stuck in 'pendingupload' past the ~30-min upload window → the upload was
+        // interrupted / abandoned and will never complete. Mark it failed so it
+        // stops showing as "Processing" forever and the client knows to re-send.
+        if (s.state === 'pendingupload' && Date.now() - new Date(r.created_at).getTime() > 60 * 60 * 1000) {
+          await admin.from('client_clips').update({ status: 'error' }).eq('id', r.id);
+          return { id: r.id, status: 'error' };
+        }
       } catch (e) {
         console.error('[client-clips] status refresh failed:', e instanceof Error ? e.message : e);
       }

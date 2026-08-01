@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as tus from 'tus-js-client';
 
 // Client-facing form-check clip uploader. Picks a video from the phone's camera
 // roll (or records one), uploads it STRAIGHT to Cloudflare Stream via a one-time
@@ -29,18 +30,20 @@ function fmtDur(s: number | null): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-// Direct browser → Cloudflare upload with a progress callback (fetch has no
-// upload-progress event, so we use XHR).
-function uploadWithProgress(url: string, file: File, onProgress: (frac: number) => void): Promise<void> {
+// Resumable browser → Cloudflare upload (tus). Auto-resumes if the connection
+// drops or the app is backgrounded, and handles large clips — unlike the old
+// single-shot POST that lost anything interrupted or over 200MB.
+function tusUpload(uploadUrl: string, file: File, onProgress: (frac: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
-    xhr.onerror = () => reject(new Error('Upload failed — check your connection.'));
-    const fd = new FormData();
-    fd.append('file', file);
-    xhr.send(fd);
+    const upload = new tus.Upload(file, {
+      uploadUrl,
+      chunkSize: 50 * 1024 * 1024, // 50 MiB — multiple of 256 KiB, required by Cloudflare
+      retryDelays: [0, 1000, 3000, 5000, 10000, 20000],
+      onProgress: (sent, total) => onProgress(total ? sent / total : 0),
+      onSuccess: () => resolve(),
+      onError: (err) => reject(err instanceof Error ? err : new Error('Upload failed')),
+    });
+    upload.start();
   });
 }
 
@@ -97,25 +100,29 @@ export default function ClipSubmitter() {
     e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('video/')) { setErr('Please choose a video clip.'); return; }
-    if (file.size > 500 * 1024 * 1024) { setErr('That clip is over 500MB — please trim it or lower the recording quality.'); return; }
+    if (file.size > 1024 * 1024 * 1024) { setErr('That clip is over 1GB — please record a shorter one.'); return; }
 
     setErr(null); setUploading(true); setProgress(0);
+    let createdId: string | null = null;
     try {
       const res = await fetch('/api/client-clips/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: label.trim() || null, muscle: muscle || null }),
+        body: JSON.stringify({ label: label.trim() || null, muscle: muscle || null, size: file.size, name: file.name }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not start the upload.');
-      await uploadWithProgress(d.uploadURL, file, setProgress);
+      createdId = d.id;
+      await tusUpload(d.uploadUrl, file, setProgress);
       await fetch('/api/client-clips/me', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }),
       });
       setLabel(''); setMuscle('');
       await load();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Upload failed.');
+      setErr(e instanceof Error ? e.message : 'Upload failed. Please try again.');
+      // Drop the placeholder row so a failed upload doesn't linger as "Uploading".
+      if (createdId) fetch(`/api/client-clips/me?id=${createdId}`, { method: 'DELETE' }).catch(() => {});
     } finally {
       setUploading(false); setProgress(0);
     }
@@ -186,6 +193,9 @@ export default function ClipSubmitter() {
                 </div>
                 <p className="text-[12px]" style={{ color: 'var(--text2)' }}>
                   {progress < 1 ? `Uploading… ${Math.round(progress * 100)}%` : 'Finishing up…'}
+                </p>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>
+                  Keep the app open until it says &ldquo;Sent&rdquo;.
                 </p>
               </div>
             ) : (

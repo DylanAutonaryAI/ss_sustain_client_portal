@@ -63,6 +63,42 @@ export async function createDirectUpload(opts: {
   });
 }
 
+// Resumable (tus) direct-creator upload — for larger clips and flaky mobile
+// connections. The old basic upload (createDirectUpload) caps at 200MB and can't
+// resume, so an interrupted or >200MB upload was lost. This reserves the upload
+// server-side (Upload-Length comes from the browser) and returns the one-time
+// upload URL (Location header) + video uid (stream-media-id header). The browser
+// then uploads to that URL with tus-js-client, which auto-resumes on drop/app-
+// switch. No API token is ever exposed to the browser.
+export async function createTusUpload(
+  sizeBytes: number,
+  opts: { creator?: string; name?: string; retentionDays: number },
+): Promise<{ uploadUrl: string; uid: string }> {
+  const scheduledDeletion = new Date(Date.now() + opts.retentionDays * 86_400_000).toISOString();
+  const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
+  // tus Upload-Metadata: comma-separated "key b64value" pairs; a bare key = flag.
+  const meta = ['requiresignedurls', `scheduleddeletion ${b64(scheduledDeletion)}`];
+  if (opts.name) meta.push(`name ${b64(opts.name.slice(0, 120))}`);
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${API_TOKEN}`,
+    'Tus-Resumable': '1.0.0',
+    'Upload-Length': String(sizeBytes),
+    'Upload-Metadata': meta.join(','),
+  };
+  if (opts.creator) headers['Upload-Creator'] = opts.creator;
+
+  const res = await fetch(`${API_BASE}/accounts/${ACCOUNT_ID}/stream?direct_user=true`, { method: 'POST', headers });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Cloudflare tus create failed: ${res.status} ${txt.slice(0, 200)}`);
+  }
+  const uploadUrl = res.headers.get('Location');
+  const uid = res.headers.get('stream-media-id');
+  if (!uploadUrl || !uid) throw new Error('Cloudflare tus create: missing Location / stream-media-id header');
+  return { uploadUrl, uid };
+}
+
 type CfVideo = {
   uid: string;
   readyToStream?: boolean;

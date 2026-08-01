@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { rateLimit } from '@/lib/rate-limit';
-import { streamConfigured, createDirectUpload, deleteVideo } from '@/lib/stream';
+import { streamConfigured, createTusUpload, deleteVideo } from '@/lib/stream';
 import {
-  RETENTION_DAYS, MAX_DURATION_SECONDS, ALLOWED_MUSCLES,
+  RETENTION_DAYS, ALLOWED_MUSCLES,
   retentionCutoffISO, refreshPending, mapClip, type ClipRow,
 } from '@/lib/client-clips';
 
@@ -49,6 +49,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const label = typeof body.label === 'string' && body.label.trim() ? body.label.trim().slice(0, 120) : null;
   const muscle = typeof body.muscle === 'string' && ALLOWED_MUSCLES.includes(body.muscle) ? body.muscle : null;
+  const size = Number(body.size);
+  if (!Number.isFinite(size) || size < 1 || size > 1024 * 1024 * 1024) {
+    return NextResponse.json({ error: 'That clip is too large (max 1GB) — please record a shorter one.' }, { status: 400 });
+  }
 
   const admin = await createAdminClient();
   const { data: clientRow } = await admin.from('clients').select('id, coach_id').eq('user_id', user.id).maybeSingle();
@@ -61,16 +65,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Daily upload limit reached — please try again tomorrow.' }, { status: 429 });
   }
 
-  let uploadURL: string, uid: string;
+  // Resumable (tus) upload — survives large clips + interrupted mobile connections.
+  let uploadUrl: string, uid: string;
   try {
-    ({ uploadURL, uid } = await createDirectUpload({
-      maxDurationSeconds: MAX_DURATION_SECONDS,
+    ({ uploadUrl, uid } = await createTusUpload(size, {
       creator: clientRow.id,
+      name: typeof body.name === 'string' ? body.name : undefined,
       retentionDays: RETENTION_DAYS,
-      meta: { clientId: clientRow.id, userId: user.id, ...(label ? { label } : {}) },
     }));
   } catch (e) {
-    console.error('[client-clips] direct_upload failed:', e instanceof Error ? e.message : e);
+    console.error('[client-clips] tus create failed:', e instanceof Error ? e.message : e);
     return NextResponse.json({ error: 'Could not start the upload. Please try again.' }, { status: 502 });
   }
 
@@ -85,7 +89,7 @@ export async function POST(request: NextRequest) {
   }).select('id').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ id: inserted.id, uploadURL });
+  return NextResponse.json({ id: inserted.id, uploadUrl });
 }
 
 export async function PATCH(request: NextRequest) {
